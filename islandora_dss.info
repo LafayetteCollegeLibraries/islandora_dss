@@ -1,0 +1,10 @@
+name = "Lafayette College Libraries Islandora Module"
+description = "Extending the base Islandora functionality in order to satisfy the requirements of the Lafayette College Institutional Repository"
+dependencies[] = islandora
+package = Lafayette College Libraries
+version = 7.x-1.1
+core = 7.x
+files[] = tests/tokens.test
+
+; This must be specified for unit testing!
+testing_api = 2.x
