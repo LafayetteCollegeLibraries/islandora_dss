@@ -293,6 +293,16 @@ function _islandora_dss_get_cdm_id($object) {
   preg_match('/item\=(.+?)</', $object['MODS']->content, $m);
   $metadb_id = $m[1];
 
+  /**
+   * Remove the initial 0 for 5 digit identifiers
+   * Resolves DSS-196
+   */
+
+  if(strlen($metadb_id) > 4) {
+
+    $metadb_id = preg_replace('/\-\d(\d{4})/', '-\1', $metadb_id);
+  }
+
   return $metadb_id;
 }
 
@@ -535,12 +545,14 @@ function islandora_dss_generate_islandora_paths($coll_pid) {
 
     try {
 
+      $subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
+
       $member = islandora_object_load($solr_doc['PID']);
       $path = array('source' => "islandora/object/{$solr_doc['PID']}",
-		    'alias' => islandora_dss_get_alias_metadb($member, array_pop($solr_doc['cdm.Relation.IsPartOf'])));
+		    'alias' => islandora_dss_get_alias_metadb($member, $subcollection));
 
       // Additionally generate the /citation paths for EAIC Objects
-      if(array_key_exists($solr_doc['cdm.Relation.IsPartOf'], $EASTASIA_RELATION_MAP)) {
+      if(array_key_exists($subcollection, $EASTASIA_RELATION_MAP)) {
 
 	$path = array('source' => "islandora/object/{$solr_doc['PID']}",
 		      'alias' => islandora_dss_get_citation_alias($member, array_pop($solr_doc['cdm.Relation.IsPartOf'])));
