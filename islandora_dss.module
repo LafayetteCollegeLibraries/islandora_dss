@@ -482,8 +482,6 @@ function islandora_dss_generate_citation_aliases($collection='East Asia Image Co
       $subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
       if(array_key_exists($subcollection, $EASTASIA_RELATION_MAP)) {
 
-	
-
 	$member = islandora_object_load($solr_doc['PID']);
 	$path = array('source' => "islandora/object/{$solr_doc['PID']}",
 		      'alias' => islandora_dss_get_citation_alias($member, $subcollection));
@@ -568,5 +566,180 @@ function islandora_dss_generate_islandora_paths($coll_pid) {
       drush_log("Failure: {$e->getMessage()}", 'error');
     }
   }
+
+}
+
+function islandora_dss_get_cdm_collections($object) {
+
+  $mods_doc = new SimpleXMLElement($object['MODS']->content);
+
+  $mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+  $result = $mods_doc->xpath('//mods:title');
+
+  $map = function($relation_is_part_of_elem) {
+
+    return (string) $relation_is_part_of_elem;
+  };
+  return array_map($map, $mods_doc->xpath('//mods:note[@type="admin"]'));
+}
+
+/**
+ * Calls imagemagick's convert command with the given arguments.
+ *
+ * @param string $src
+ *   The source file uri to convert from.
+ * @param string $dest
+ *   The destination file uri to convert into.
+ * @param int $width
+ *   The source file to convert from.
+ * @param int $height
+ *   The destination file to convert into.
+ *
+ * @return string
+ *   The destination file path if successful otherwise FALSE.
+ */
+function islandora_dss_large_image_imagemagick_convert($src, $dest, $args) {
+
+  $src = drupal_realpath($src);
+  $dest = drupal_realpath($dest);
+  $context = array(
+    'source' => $src,
+    'destination' => $dest,
+  );
+  drupal_alter('imagemagick_arguments', $args, $context);
+  /**
+   * To make use of ImageMagick 6's parenthetical command grouping we need to make the $source image the first parameter and $dest the last.
+   * See http://www.imagemagick.org/Usage/basics/#cmdline
+   */
+  $command = escapeshellarg($src) . ' ' . implode(' ', $args) . ' ' . escapeshellarg($dest);
+  $output = '';
+  $ret = -1;
+
+  // Remove
+  print $command;
+
+  if (_imagemagick_convert_exec($command, $output, $ret) !== TRUE) {
+    $message = 'imagemagick convert failed to create derivative<br/>Error: @ret<br/>Command: @command<br/>Output: @output';
+    $variables = array('@ret' => $ret, '@command' => $command, '@output' => $output);
+    watchdog('islandora_large_image', $message, $variables, WATCHDOG_ERROR);
+    return FALSE;
+  }
+  return $dest;
+}
+
+/**
+ * Generate paths for Islandora Collection Objects
+ *
+ * @todo Refactor into a class for Islandora Collection Objects
+ *
+ */
+function islandora_dss_generate_derivative_jpg_large_image($pid) {
+
+  /*
+  if (!isset($object['OBJ'])) {
+    drupal_set_message(t('Could not create image derivatives for %s.  No image file was uploaded.', array('%s' => $object->id)), 'error');
+    return FALSE;
+  }
+  $base_name = str_replace(':', '-', $object->id);
+  $uploaded_file = islandora_large_image_get_uploaded_file($object, $base_name);
+  if ($uploaded_file) {
+    $jp2 = islandora_large_image_create_JP2_derivative($object, $uploaded_file, $base_name);
+    $jpg = islandora_large_image_create_JPG_derivative($object, $uploaded_file, $base_name);
+    $tn = islandora_large_image_create_TN_derivative($object, $uploaded_file, $base_name);
+    return $jp2 && $jpg && $tn && file_unmanaged_delete($uploaded_file);
+  }
+  return FALSE;
+   */
+
+  /*
+
+function islandora_large_image_create_JPG_derivative(AbstractFedoraObject $object, $uploaded_file, $base_name) {
+  $args = array();
+  $args[] = '-resize ' . escapeshellarg("600 x 800");
+  $args[] = '-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75));
+  $derivative_file = islandora_large_image_imagemagick_convert($uploaded_file, "temporary://{$base_name}_JPG.jpg", $args);
+  if ($derivative_file === FALSE) {
+    drupal_set_message(t('Failed to create JPG derivative'), 'error');
+    return FALSE;
+  }
+  islandora_large_image_add_datastream($object, 'JPG', $derivative_file, 'image/jpeg', t('Medium sized JPEG'));
+  return file_unmanaged_delete($derivative_file);
+}
+  */
+
+  /*
+convert [TIFF_FILE_PATH] -resize 600x800 -quality 75 +delete -background White -gravity center label:"[COLLECTION_NAME]\nLafayette College Libraries\nhttp://digital.lafayette.edu/[DRUPAL_PATH_ALIAS]" \
+    -append [JPEG_FILE_PATH]
+   */
+
+  /*
+  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');
+  try {
+
+    $solr_query = "PID:\"$pid\"";
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf', 'sort' => 'dc.title asc'));
+  } catch (Exception $e) {
+
+    drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
+  }
+  $solr_results = json_decode($results->getRawResponse(), TRUE);
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+  }
+  */
+
+  $url = 'http://localhost:8080/fedora';
+  $connection = islandora_get_tuque_connection(user_load(1), $url);
+  $object = $connection->repository->getObject(urldecode($pid));
+
+  //$object = islandora_object_load($pid);
+  $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
+  $base_name = str_replace(':', '-', $object->id);
+  $tiff_file = file_save_data($object['OBJ']->content, "temporary://{$base_name}_OBJ.tiff");
+
+  $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");
+
+  /*
+convert warCasualties-10_OBJ_20.tiff[0] -resize '600x800' -quality '75' \( -background White -gravity center -bordercolor White -border 8 label:"Lafayette World War II Casualties\nLafayette College Libraries\nhttp://digital.lafayette.edu/collections/war/war-casualties-00004" \) -append warCasualties_10_JPG.jpg
+  */
+  $args = array();
+  $args[] = '-resize ' . escapeshellarg("600x800");
+  $args[] = '-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75));
+
+  // For members of the Marquis de Lafayette Prints Collection
+  //$args[] = '+delete';
+
+  // For the label (branding)
+  $args[] = '\(';
+  $args[] = '-background White';
+  $args[] = '-gravity center';
+  // Insecure
+  $args[] = "label:\"$collection_name\\nLafayette College Libraries\\nhttp://digital.lafayette.edu/$path_alias\"";
+  $args[] = '\)';
+  $args[] = '-append';
+
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+
+  $derivative_file = islandora_large_image_imagemagick_convert($tiff_file->uri, "temporary://{$base_name}_JPG.jpg", $args);
+  if ($derivative_file === FALSE) {
+
+    drupal_set_message(t('Failed to create JPG derivative'), 'error');
+    return FALSE;
+  }
+  drush_log("Successfully generated the JPG for {$object->id}", 'success');
+
+  $jpg_ds = $object['JPG'];
+  if($jpg_ds) {
+
+    islandora_delete_datastream($jpg_ds);
+  }
+
+  islandora_large_image_add_datastream($object, 'JPG', $derivative_file, 'image/jpeg', t('Medium sized JPEG'));
+  drush_log("Successfully ingested the JPG into the JPG datastream for {$object->id}", 'success');
+  return file_unmanaged_delete($derivative_file);
+}
+
+function islandora_dss_generate_jpeg_derivative_book($coll_pid) {
 
 }

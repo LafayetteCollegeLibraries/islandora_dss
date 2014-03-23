@@ -142,6 +142,15 @@ function islandora_dss_drush_command() {
 			      ),
 	  'aliases' => array('icg-cite'));
 
+  $items['islandora-collection-generate-derivatives-jpg'] =
+    array(
+	  'description' => dt('Generate JPG derivatives for Islandora Large Image and Page Objects'),
+	  'arguments' => array('arg1' => dt('the collection'),
+			       ),
+	  'examples' => array('Standard example' => '',
+			      ),
+	  'aliases' => array('icg-deriv-jpg'));
+
   $items['islandora-update-mods-field'] =
     array(
 	  'description' => dt('Update a MODS field for an Islandora Object'),
@@ -750,6 +759,25 @@ function drush_islandora_dss_islandora_collection_generate_paths($collection_nam
 function drush_islandora_dss_islandora_collection_generate_citation_aliases() {
 
   islandora_dss_generate_citation_aliases();
+}
+
+function drush_islandora_dss_islandora_collection_generate_derivatives_jpg($collection) {
+
+  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');
+  try {
+
+    $solr_query = "cdm.Relation.IsPartOf:\"$collection\"";
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf', 'sort' => 'dc.title asc'));
+  } catch (Exception $e) {
+
+    drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
+  }
+  $solr_results = json_decode($results->getRawResponse(), TRUE);
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    islandora_dss_generate_derivative_jpg_large_image($solr_doc['PID']);
+  }
 }
 
 /**
