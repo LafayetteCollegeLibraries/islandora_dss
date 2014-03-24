@@ -763,6 +763,26 @@ function drush_islandora_dss_islandora_collection_generate_citation_aliases() {
 
 function drush_islandora_dss_islandora_collection_generate_derivatives_jpg($collection) {
 
+  $EASTASIA_RELATION_MAP = array('East Asia Image Collection' => 'eastasia',
+				 'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
+				 'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
+				 'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
+				 'Sino-Japanese War Postcard Album 01' => 'eastasia/pa-omitsu01',
+				 'Sino-Japanese War Postcard Album 02' => 'eastasia/pa-omitsu02',
+				 'Lin Chia-Feng Family Postcard Collection' => 'eastasia/lin-postcards',
+				 'Japanese History Study Cards' => 'eastasia/japan-study-cards',
+				 'Pacific War Postcard Collection' => 'eastasia/pacwar-postcards',
+				 'Michael Lewis Taiwan Postcard Collection' => 'eastasia/lewis-postcards',
+				 'Gerald & Rella Warner Taiwan Postcard Collection' => 'eastasia/warner-postcards',
+				 'Gerald & Rella Warner Dutch East Indies Negative Collection' => 'eastasia/warner-negs-indonesia',
+				 'Gerald & Rella Warner Manchuria Negative Collection' => 'eastasia/warner-negs-manchuria',
+				 'Gerald & Rella Warner Taiwan Negative Collection' => 'eastasia/warner-negs-taiwan',
+				 'Gerald & Rella Warner Japan Slide Collection' => 'eastasia/warner-slides-japan',
+				 'Gerald & Rella Warner Souvenirs of Beijing and Tokyo' => 'eastasia/warner-souvenirs',
+				 'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
+				 'Scenic Taiwan' => 'eastasia/cpw-nofuko',
+				 'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai');
+
   $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');
   try {
 
@@ -776,7 +796,14 @@ function drush_islandora_dss_islandora_collection_generate_derivatives_jpg($coll
 
   foreach($solr_results['response']['docs'] as $solr_doc) {
 
-    islandora_dss_generate_derivative_jpg_large_image($solr_doc['PID']);
+    $subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
+    if(array_key_exists($subcollection, $EASTASIA_RELATION_MAP)) {
+
+      islandora_dss_generate_derivative_jpg_book($solr_doc['PID']);
+    } else {
+
+      islandora_dss_generate_derivative_jpg_large_image($solr_doc['PID']);
+    }
   }
 }
 

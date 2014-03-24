@@ -569,6 +569,64 @@ function islandora_dss_generate_islandora_paths($coll_pid) {
 
 }
 
+function islandora_dss_get_metadb_id($object) {
+
+  $mods_doc = new SimpleXMLElement($object['MODS']->content);
+
+  $mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+  $result = $mods_doc->xpath('//mods:title');
+
+  $map = function($relation_is_part_of_elem) {
+
+    return (string) $relation_is_part_of_elem;
+  };
+  $metadb_download_url = array_pop(array_map($map, $mods_doc->xpath('//mods:location/mods:url[@displayLabel="Download"]')));
+
+  preg_match('/\=(.+)$/', $metadb_download_url, $m);
+  return $m[1];
+}
+
+function islandora_dss_get_metadb_file_path($object, $is_back = FALSE) {
+
+  $EAIC_SECONDARY_DIR_MAP = array(
+				  'imperial-postcards' => 'imperial-postcards/backs', //b jpg or tiff
+				  'pa-koshitsu' => 'pa-koshitsu', //b jpg
+				  'pa-tsubokura' => 'pa-tsubokura', //b jpg
+				  'pa-omitsu01' => 'pa-omitsu01', //b jpg
+				  'pa-omitsu02' => 'pa-omitsu02', //b jpg
+
+				  'lin-postcards' => 'lin-postcards/back.orig', //b jpg
+				  'pacwar-postcards' => 'pacwar-postcards/backs-300dpi', //b jpg
+				  'lewis-postcards' => 'lewis/fixed-lewis-postcard-backs', //b jpg
+				  'warner-postcards' => 'warner/warner-postcards-captioned/jpg', //5 digits //jpg
+				  'warner-negs-manchuria' => 'warner-negs-manchuria', //tif //lc-spcol-warner-negs-manchuria-submerged
+				  'warner-negs-taiwan' => 'warner-negs-taiwan/warner-negs-taiwan-submerged-images', //5 digits tiff
+				  'woodsworth-images' => 'woodsworth-images/image-backs', // -back //jpg
+
+				  'cpw-nofuko' => 'nofuko/nofuko-missing-pages-hoover-originals' // 5 digit //jpg
+				  );
+
+  $metadb_id = islandora_dss_get_metadb_id($object);
+
+  $metadb_id = preg_replace('/0(\d{4})$/', '\1', $metadb_id);
+
+  // /mnt/imago1/master/MetaDB/imperial-postcards/lc-spcol-imperial-postcards-0001.tif
+  preg_match('/(.+?)\-\d{4}/', $metadb_id, $m);
+  $subdir = $m[1];
+
+  if($is_back and array_key_exists($subdir, $EAIC_SECONDARY_DIR_MAP)) {
+
+    //return '/mnt/imago1/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/lc-spcol-' . $metadb_id . '.tif';
+    //return '/mnt/imago1/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/lc-spcol-' . $metadb_id . 'b.tif';
+
+    ///mnt/imago1/master/other/warner-negs-taiwan/warner-negs-taiwan-submerged-images/*0083*
+
+    return array_shift(glob('/mnt/imago1/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/*' . $metadb_id . '*'));
+  }
+
+  return '/mnt/imago1/master/MetaDB/' . 'imperial-postcards/' . 'lc-spcol-' . $metadb_id . '.tif';
+}
+
 function islandora_dss_get_cdm_collections($object) {
 
   $mods_doc = new SimpleXMLElement($object['MODS']->content);
@@ -615,9 +673,6 @@ function islandora_dss_large_image_imagemagick_convert($src, $dest, $args) {
   $output = '';
   $ret = -1;
 
-  // Remove
-  print $command;
-
   if (_imagemagick_convert_exec($command, $output, $ret) !== TRUE) {
     $message = 'imagemagick convert failed to create derivative<br/>Error: @ret<br/>Command: @command<br/>Output: @output';
     $variables = array('@ret' => $ret, '@command' => $command, '@output' => $output);
@@ -627,13 +682,36 @@ function islandora_dss_large_image_imagemagick_convert($src, $dest, $args) {
   return $dest;
 }
 
+function islandora_dss_generate_derivative_jpg_book($pid) {
+
+  $url = 'http://localhost:8080/fedora';
+  $connection = islandora_get_tuque_connection(user_load(1), $url);
+  $object = $connection->repository->getObject(urldecode($pid));
+
+  $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
+  $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");
+
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+  // @see islandora_book_islandora_delete_object_form_delete_pages_submit()
+  $get_pid = function($o) {
+    return $o['pid'];
+  };
+
+  $is_back = FALSE;
+  foreach(array_values(array_map($get_pid, islandora_paged_content_get_pages($object))) as $page_pid) {
+
+    islandora_dss_generate_derivative_jpg_large_image($page_pid, $connection, $collection_name, $path_alias, $is_back);
+    $is_back = TRUE;
+  }
+}
+
 /**
  * Generate paths for Islandora Collection Objects
  *
  * @todo Refactor into a class for Islandora Collection Objects
  *
  */
-function islandora_dss_generate_derivative_jpg_large_image($pid) {
+function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = NULL, $collection_name = NULL, $path_alias = NULL, $is_back = FALSE) {
 
   /*
   if (!isset($object['OBJ'])) {
@@ -689,16 +767,39 @@ convert [TIFF_FILE_PATH] -resize 600x800 -quality 75 +delete -background White -
   }
   */
 
-  $url = 'http://localhost:8080/fedora';
-  $connection = islandora_get_tuque_connection(user_load(1), $url);
+  if(!isset($connection)) {
+
+    $url = 'http://localhost:8080/fedora';
+    $connection = islandora_get_tuque_connection(user_load(1), $url);
+  }
   $object = $connection->repository->getObject(urldecode($pid));
 
-  //$object = islandora_object_load($pid);
-  $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
-  $base_name = str_replace(':', '-', $object->id);
-  $tiff_file = file_save_data($object['OBJ']->content, "temporary://{$base_name}_OBJ.tiff");
+  if(!isset($collection_name)) {
 
-  $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");
+    $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
+  }
+  if(!isset($path_alias)) {
+
+    $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");
+  }
+
+  $base_name = str_replace(':', '-', $object->id);
+
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+
+  // Apparently, the TIFF wasn't ingested for Page Objects
+  if(!$object['OBJ']) {
+
+    $parent = islandora_object_load(array_pop($object->getParents()));
+    $metadb_file_path = islandora_dss_get_metadb_file_path($parent, $is_back);
+
+    drush_log("Ingesting $metadb_file_path into the OBJ datastream for for {$object->id}...", 'ok');
+
+    // /mnt/imago1/master/MetaDB/imperial-postcards/lc-spcol-imperial-postcards-0001.tif
+    islandora_large_image_add_datastream($object, 'OBJ', $metadb_file_path, 'image/tiff', t('Lossless TIFF'));
+  }
+
+  $tiff_file = file_save_data($object['OBJ']->content, "temporary://{$base_name}_OBJ.tiff");
 
   /*
 convert warCasualties-10_OBJ_20.tiff[0] -resize '600x800' -quality '75' \( -background White -gravity center -bordercolor White -border 8 label:"Lafayette World War II Casualties\nLafayette College Libraries\nhttp://digital.lafayette.edu/collections/war/war-casualties-00004" \) -append warCasualties_10_JPG.jpg
@@ -719,9 +820,8 @@ convert warCasualties-10_OBJ_20.tiff[0] -resize '600x800' -quality '75' \( -back
   $args[] = '\)';
   $args[] = '-append';
 
-  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
-
   $derivative_file = islandora_large_image_imagemagick_convert($tiff_file->uri, "temporary://{$base_name}_JPG.jpg", $args);
+  //$derivative_file = islandora_dss_large_image_imagemagick_convert($tiff_file->uri, "temporary://{$base_name}_JPG.jpg", $args);
   if ($derivative_file === FALSE) {
 
     drupal_set_message(t('Failed to create JPG derivative'), 'error');
@@ -737,7 +837,24 @@ convert warCasualties-10_OBJ_20.tiff[0] -resize '600x800' -quality '75' \( -back
 
   islandora_large_image_add_datastream($object, 'JPG', $derivative_file, 'image/jpeg', t('Medium sized JPEG'));
   drush_log("Successfully ingested the JPG into the JPG datastream for {$object->id}", 'success');
-  return file_unmanaged_delete($derivative_file);
+
+  try {
+
+    file_delete($tiff_file);
+  } catch(PDOException $e) {
+
+    drush_log("Could not delete the temporary TIFF file: {$e->getMessage()}", 'warning');
+  }
+
+  try {
+
+    $result = file_unmanaged_delete($derivative_file);
+  } catch(PDOException $e) {
+
+    drush_log("Could not delete the temporary JPEG file: {$e->getMessage()}", 'warning');
+  }
+
+  return $result;
 }
 
 function islandora_dss_generate_jpeg_derivative_book($coll_pid) {
