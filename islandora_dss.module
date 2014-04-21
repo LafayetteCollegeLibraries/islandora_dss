@@ -1103,7 +1103,7 @@ function islandora_dss_object_datastream_access_callback($perm, $object = NULL, 
  */
 function islandora_dss_object_datastream_tokened_access_callback($perm, $object = NULL, $datastream = NULL) {
 
-  return islandora_dss_object_datastream_access_callback($perm, $object, $datastream, $account) && islandora_object_datastream_tokened_access_callback($perm, $object, $datastream, $account);
+  return islandora_dss_object_datastream_access_callback($perm, $object, $datastream) && islandora_object_datastream_tokened_access_callback($perm, $object, $datastream);
 }
 
 /**
