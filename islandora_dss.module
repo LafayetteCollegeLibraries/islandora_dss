@@ -313,7 +313,7 @@ function _islandora_dss_get_cdm_id($object) {
  */
 function _islandora_dss_get_metadb_id($object) {
 
-  if(preg_match('/^\[(\w+\d+)\]/', $object->label, $m)) {
+  if(preg_match('/^\[([a-zA-Z]+\d+)\]/', $object->label, $m)) {
 
     return $m[1];
   }
@@ -386,6 +386,7 @@ function islandora_dss_get_alias_metadb($object, $coll_pid=NULL, $path_base='col
   } else {
 
     $EASTASIA_PID_MAP = array('East Asia Image Collection' => 'eastasia',
+			      'Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
 			      'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
 			      'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
 			      'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
@@ -480,6 +481,10 @@ function islandora_dss_generate_citation_aliases($collection='East Asia Image Co
 
       // Additionally generate the /citation paths for EAIC Objects
       $subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
+
+      drush_log("Generating the alias $alias for {$solr_doc['PID']} in $subcollection", 'okay');
+      exit(1);
+
       if(array_key_exists($subcollection, $EASTASIA_RELATION_MAP)) {
 
 	$member = islandora_object_load($solr_doc['PID']);
@@ -510,6 +515,7 @@ function islandora_dss_generate_islandora_paths($coll_pid) {
   $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');
 
   $EASTASIA_RELATION_MAP = array('East Asia Image Collection' => 'eastasia',
+				 'Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
 				 'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
 				 'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
 				 'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
@@ -546,17 +552,31 @@ function islandora_dss_generate_islandora_paths($coll_pid) {
       $subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
 
       $member = islandora_object_load($solr_doc['PID']);
+      $alias = islandora_dss_get_alias_metadb($member, $subcollection);
+
       $path = array('source' => "islandora/object/{$solr_doc['PID']}",
-		    'alias' => islandora_dss_get_alias_metadb($member, $subcollection));
+		    'alias' => $alias);
+
+      drush_log("Generating $alias for {$solr_doc['PID']} within $subcollection", 'ok');
 
       // Additionally generate the /citation paths for EAIC Objects
+      /*
       if(array_key_exists($subcollection, $EASTASIA_RELATION_MAP)) {
 
 	$path = array('source' => "islandora/object/{$solr_doc['PID']}",
 		      'alias' => islandora_dss_get_citation_alias($member, array_pop($solr_doc['cdm.Relation.IsPartOf'])));
+	//'alias' => islandora_dss_get_alias_metadb($member, array_pop($solr_doc['cdm.Relation.IsPartOf'])));
       }
+      */
       
       path_delete(array('source' => $path['source']));
+
+      if($alias == 'collections/') {
+
+	drush_log("Cannot generate the path for {$solr_doc['PID']}", 'warn');
+	exit(1);
+      }
+
       path_save($path);
 
       // Is there a back for these images?
@@ -624,7 +644,7 @@ function islandora_dss_get_metadb_file_path($object, $is_back = FALSE) {
     return array_shift(glob('/mnt/imago1/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/*' . $metadb_id . '*'));
   }
 
-  return '/mnt/imago1/master/MetaDB/' . 'imperial-postcards/' . 'lc-spcol-' . $metadb_id . '.tif';
+  return '/mnt/imago1/master/MetaDB/' . "$subdir/" . 'lc-spcol-' . $metadb_id . '.tif';
 }
 
 function islandora_dss_get_cdm_collections($object) {
@@ -838,6 +858,7 @@ convert warCasualties-10_OBJ_20.tiff[0] -resize '600x800' -quality '75' \( -back
   islandora_large_image_add_datastream($object, 'JPG', $derivative_file, 'image/jpeg', t('Medium sized JPEG'));
   drush_log("Successfully ingested the JPG into the JPG datastream for {$object->id}", 'success');
 
+  /*
   try {
 
     file_delete($tiff_file);
@@ -853,10 +874,241 @@ convert warCasualties-10_OBJ_20.tiff[0] -resize '600x800' -quality '75' \( -back
 
     drush_log("Could not delete the temporary JPEG file: {$e->getMessage()}", 'warning');
   }
+  */
+  file_delete($tiff_file);
+  $result = file_unmanaged_delete($derivative_file);
 
   return $result;
 }
 
 function islandora_dss_generate_jpeg_derivative_book($coll_pid) {
 
+}
+
+/*
+function islandora_book_upload_page_form_submit(array $form, array &$form_state) {
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+  $object = islandora_ingest_form_get_object($form_state);
+  $file = file_load($form_state['values']['file']);
+  $object->label = $file->filename;
+  islandora_paged_content_update_datastream($object, drupal_realpath($file->uri), 'OBJ', NULL, NULL, 'M', FALSE);
+  // Update RELS-EXT properties, page/sequence/etc, and append the page at the
+  // end of the book.
+  $rels_ext = $object->relationships;
+  $language = $form_state['values']['language'];
+  $shared_storage = islandora_ingest_form_get_shared_storage($form_state);
+  $book = islandora_object_load($shared_storage['book']);
+  $pages = islandora_paged_content_get_pages($book);
+  $num_pages = count($pages) + 1;
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
+  islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
+  islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
+}
+*/
+
+/**
+ * Generate derivatives for a Book Object
+ *
+ * @see islandora_book_islandora_pagecmodel_islandora_object_ingested()
+ */
+function islandora_dss_book_derive($object) {
+
+  $derived_images = islandora_paged_content_can_derive($object, 'JP2') && islandora_paged_content_page_derive_image_datastreams($object);
+  if ($derived_images) {
+    $book_pid = islandora_paged_content_get_relationship($object->relationships, FEDORA_RELS_EXT_URI, 'isMemberOf', NULL);
+    $book_object = islandora_object_load($book_pid);
+    if ($book_object) {
+
+      return islandora_paged_content_update_paged_content_thumbnail($book_object);
+    }
+  }
+}
+
+/**
+ * Ingest a single Page for a Book Object
+ *
+ * @see islandora_book_upload_page_form_submit()
+ * @see islandora_prepare_new_object()
+ */
+function islandora_dss_book_page_ingest($file, $book_pid, $object_pid = NULL, $language = 'en-US') {
+
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  if(isset($object_pid)) {
+
+    $object = islandora_object_load($object_pid);
+  } else {
+
+    $tuque = islandora_get_tuque_connection(user_load(1));
+    //$object = new IslandoraNewFedoraObject(NULL, $tuque->repository);
+    $object = $tuque->repository->constructObject();
+  }
+
+
+  $object->label = $file->filename;
+  islandora_paged_content_update_datastream($object, drupal_realpath($file->uri), 'OBJ', NULL, NULL, 'M', FALSE);
+  // Update RELS-EXT properties, page/sequence/etc, and append the page at the
+  // end of the book.
+  $rels_ext = $object->relationships;
+  //$language = $form_state['values']['language'];
+  //$shared_storage = islandora_ingest_form_get_shared_storage($form_state);
+
+  // Retrieve the Book Object
+  $book = islandora_object_load($book_pid);
+
+  $pages = islandora_paged_content_get_pages($book);
+
+  if(count($pages) > 1) {
+
+    $last_page = array_pop($pages);
+    $last_page = islandora_object_load($last_page['pid']);
+    $last_page->delete();
+  }
+
+  $num_pages = count($pages) + 1;
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
+  islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
+  islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
+
+  islandora_add_object($object);
+
+  return islandora_dss_book_derive($object);
+}
+
+function islandora_dss_strip_ellipsis($collection_name) {
+
+  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');
+
+  try {
+
+    $solr_query = "cdm.Relation.IsPartOf:\"$collection_name\"";
+    //$solr_query = "cdm.Relation.IsPartOf:\"$collection_name\"";
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf', 'sort' => 'dc.title asc'));
+  } catch (Exception $e) {
+
+    drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
+  }
+  $solr_results = json_decode($results->getRawResponse(), TRUE);
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    $object = islandora_object_load($solr_doc['PID']);
+
+    $dc_ds = $object['DC'];
+
+    $dc_doc = new SimpleXMLElement($dc_ds->content);
+
+    // For parsing XPaths
+    // (Should be refactored)
+    $dc_doc->registerXPathNamespace("xml", "http://www.w3.org/XML/1998/namespace");
+    $dc_doc->registerXPathNamespace("dc", "http://purl.org/dc/elements/1.1/");
+    
+    $title_element = array_shift($dc_doc->xpath('//dc:title'));
+
+    $normalized_title = str_replace('...', '', $title_element->{0});
+    $title_element->{0} = $normalized_title;
+    $object->label = $normalized_title;
+
+    drush_log("Updating the DC datastream for {$object->id}..", 'ok');
+    $dc_ds->setContentFromString($dc_doc->asXML());
+    drush_log("Successfully updated the DC datastream for {$object->id}..", 'success');
+  }
+}
+
+/**
+ * Search the Resource Index by dc:title value
+ *
+ */
+
+function _islandora_dss_search_ri_dc_title($title, $user) {
+
+    $query = '
+SELECT ?subject
+FROM <#ri>
+WHERE {
+
+?subject <dc:title> ?title ;
+         <fedora-model:state> <info:fedora/fedora-system:def/model#Active> ;
+FILTER regex(?title, "' . $title . '") .
+}
+';
+    $tuque = islandora_get_tuque_connection($user);
+    return $tuque->repository->ri->sparqlQuery($query);
+}
+
+/**
+ * Checks whether the user can access the given object and datastream.
+ *
+ * Checks for object existance, accessiblitly, namespace permissions,
+ * and user permissions
+ *
+ * @param string $perm
+ *   The user permission to test for.
+ * @param FedoraObject $object
+ *   The object to test, if NULL given the object doesn't exist or is
+ *   inaccessible.
+ * @param FedoraDatastream $datastream
+ *   The datastream to test, if NULL given the datastream doesn't exist
+ *   or is inaccessible.
+ * @param StdObject $account
+ *   The account to test permissions as or NULL for current user.
+ *
+ * @return bool
+ *   TRUE if the user is allowed to access this object, FALSE otherwise.
+ */
+function islandora_dss_object_datastream_access_callback($perm, $object = NULL, $datastream = NULL, $account = NULL) {
+
+  $ISLANDORA_DSS_RESTRICTED_DS_IDS = array('MODS', 'MODS-M', 'OBJ');
+
+  if($datastream->id == 'OBJ') {
+
+    // If this isn't the newspaper...
+    /* @todo Refactor */
+    if(!in_array('islandora:newspaper', $object->getParents())) {
+
+      // Authenticated
+      return user_access('administer site configuration') && islandora_object_datastream_access_callback($perm, $object, $datastream, $account);
+    }
+  } elseif(in_array($datastream->id, $ISLANDORA_DSS_RESTRICTED_DS_IDS)) {
+
+    // Authenticated
+    return user_access('administer site configuration') && islandora_object_datastream_access_callback($perm, $object, $datastream, $account);
+  }
+
+  /*
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  return user_access($perm, $account) && is_object($object) && islandora_namespace_accessible($object->id) && is_object($datastream);
+  */
+
+  return islandora_object_datastream_access_callback($perm, $object, $datastream, $account);
+}
+
+/**
+ * Checks whether the user can access the given object and datastream.
+ *
+ * This function will validate and use a token if present in the GET parameters.
+ *
+ * Checks for object existance, accessiblitly, namespace permissions,
+ * and user permissions
+ *
+ * @see islandora_object_datastream_tokened_access_callback()
+ */
+function islandora_dss_object_datastream_tokened_access_callback($perm, $object = NULL, $datastream = NULL) {
+
+  return islandora_dss_object_datastream_access_callback($perm, $object, $datastream, $account) && islandora_object_datastream_tokened_access_callback($perm, $object, $datastream, $account);
+}
+
+function islandora_dss_menu_alter(&$items) {
+
+  $items['islandora/object/%islandora_object/datastream/%islandora_datastream']['access callback'] = 'islandora_dss_object_datastream_access_callback';
+  $items['islandora/object/%islandora_tokened_object/datastream/%islandora_tokened_datastream/view']['access callback'] = 'islandora_dss_object_datastream_tokened_access_callback';
+  $items['islandora/object/%islandora_object/datastream/%islandora_datastream/download']['access callback'] = 'islandora_dss_object_datastream_access_callback';
 }
