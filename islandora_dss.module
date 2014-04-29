@@ -303,6 +303,13 @@ function _islandora_dss_get_cdm_id($object) {
     $metadb_id = preg_replace('/\-\d(\d{4})/', '-\1', $metadb_id);
   }
 
+  /**
+   * Restructure the identifiers for the Historical Photograph Collection
+   * Resolves DSS-285
+   *
+   */
+  $metadb_id = str_replace('cap', 'hpc', $metadb_id);
+  
   return $metadb_id;
 }
 
