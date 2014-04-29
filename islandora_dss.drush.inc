@@ -861,7 +861,7 @@ function drush_islandora_dss_islandora_tokens_test($obj_pid='rjwStereo:123') {
  * Generate paths for Islandora Objects
  *
  */
-function drush_islandora_dss_islandora_collection_generate_paths($collection_name=NULL) {
+function drush_islandora_dss_islandora_collection_generate_paths($collection_name = NULL, $solr_host = 'localhost') {
 
   if(!isset($collection_name)) {
 
@@ -872,11 +872,11 @@ function drush_islandora_dss_islandora_collection_generate_paths($collection_nam
 		  'Marquis de Lafayette Prints Collection',
 		  'McKelvy House Photograph Collection') as $collection_name) {
 
-      islandora_dss_generate_islandora_paths($collection_name);
+      islandora_dss_generate_islandora_paths($collection_name, $solr_host);
     }
   } else {
 
-    islandora_dss_generate_islandora_paths($collection_name);
+    islandora_dss_generate_islandora_paths($collection_name, $solr_host);
   }
 }
 
