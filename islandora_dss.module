@@ -517,9 +517,9 @@ function islandora_dss_generate_citation_aliases($collection='East Asia Image Co
  * @todo Refactor into a class for Islandora Collection Objects
  *
  */
-function islandora_dss_generate_islandora_paths($coll_pid) {
+function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localhost') {
 
-  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');
+  $solr = new Apache_Solr_Service($solr_host, 8080, 'solr/fedora_5' . '/');
 
   $EASTASIA_RELATION_MAP = array('East Asia Image Collection' => 'eastasia',
 				 'Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
