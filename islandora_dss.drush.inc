@@ -1,4 +1,4 @@
-<?php
+1;2501;0c<?php
 
 function islandora_dss_drush_help($command) {
 

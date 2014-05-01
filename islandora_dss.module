@@ -545,7 +545,7 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
   try {
 
     $solr_query = "cdm.Relation.IsPartOf:\"$coll_pid\"";
-    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf', 'sort' => 'dc.title asc'));
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf dc.date.sort', 'sort' => 'dc.title asc'));
   } catch (Exception $e) {
 
     drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
@@ -559,23 +559,25 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
       $subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
 
       $member = islandora_object_load($solr_doc['PID']);
-      $alias = islandora_dss_get_alias_metadb($member, $subcollection);
+
+      /**
+       * Specialized handling for the newspaper aliases
+       *
+       */
+      if($subcollection == 'Lafayette Newspaper Collection') {
+
+	$alias = $solr_doc['dc.date.sort'];
+	preg_match('/(\d{4}-\d{2}-\d{2})/', $alias, $m);
+	$alias = 'collections/newspaper/' . implode(explode('-', $m[1]));
+      } else {
+
+	$alias = islandora_dss_get_alias_metadb($member, $subcollection);
+      }
 
       $path = array('source' => "islandora/object/{$solr_doc['PID']}",
 		    'alias' => $alias);
 
       drush_log("Generating $alias for {$solr_doc['PID']} within $subcollection", 'ok');
-
-      // Additionally generate the /citation paths for EAIC Objects
-      /*
-      if(array_key_exists($subcollection, $EASTASIA_RELATION_MAP)) {
-
-	$path = array('source' => "islandora/object/{$solr_doc['PID']}",
-		      'alias' => islandora_dss_get_citation_alias($member, array_pop($solr_doc['cdm.Relation.IsPartOf'])));
-	//'alias' => islandora_dss_get_alias_metadb($member, array_pop($solr_doc['cdm.Relation.IsPartOf'])));
-      }
-      */
-      
       path_delete(array('source' => $path['source']));
 
       if($alias == 'collections/') {
