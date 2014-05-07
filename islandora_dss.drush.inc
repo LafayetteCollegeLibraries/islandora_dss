@@ -138,6 +138,15 @@ function islandora_dss_drush_command() {
 			      ),
 	  'aliases' => array('icg-gen-alias'));
 
+  $items['islandora-collection-update-paths'] =
+    array(
+	  'description' => dt('Update paths for Islandora Objects'),
+	  'arguments' => array('arg1' => dt('the Fedora Commons Object PID'),
+			       ),
+	  'examples' => array('Standard example' => '',
+			      ),
+	  'aliases' => array('icg-up-alias'));
+
   $items['islandora-collection-purge-paths'] =
     array(
 	  'description' => dt('Purge paths for Islandora Objects'),
@@ -909,6 +918,25 @@ function drush_islandora_dss_islandora_collection_generate_paths($collection_nam
   } else {
 
     islandora_dss_generate_islandora_paths($collection_name, $solr_host);
+  }
+}
+
+function drush_islandora_dss_islandora_collection_update_paths($collection_name = NULL, $solr_host = 'localhost') {
+
+  if(!isset($collection_name)) {
+
+    foreach(array('East Asia Image Collection',
+		  'Geology Department Slide Collection',
+		  'Historical Photograph Collection',
+		  'Lafayette World War II Casualties',
+		  'Marquis de Lafayette Prints Collection',
+		  'McKelvy House Photograph Collection') as $collection_name) {
+
+      islandora_dss_update_islandora_paths($collection_name, $solr_host);
+    }
+  } else {
+
+    islandora_dss_update_islandora_paths($collection_name, $solr_host);
   }
 }
 
