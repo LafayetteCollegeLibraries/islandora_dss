@@ -1272,6 +1272,127 @@ function islandora_dss_object_datastream_access_callback($perm, $object = NULL, 
 }
 
 /**
+ * Ingestion for the Yohe photograph album surrogates
+ *
+ */
+
+function islandora_dss_yohe_svg_selector($rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0) {
+
+  $svg_doc = "<?xml version='1.0'?>
+<svg width='$rect_width' height='$rect_height' viewPort='0 0 $rect_width $rect_height' version='1.1' xmlns='http://www.w3.org/2000/svg'>
+    <rect x='$rect_x' y='$rect_y' width='$rect_width' height='$rect_height'/>
+</svg>";
+
+  return $svg_doc;
+}
+
+/**
+ * Generating the UUID using OpenSSL
+ * Used for a persistent identifier specifying the embedded SVG selector
+ *
+ * Taken from the following implementation: http://stackoverflow.com/a/15875555
+ *
+ */
+
+function islandora_dss_uuid_v4() {
+  
+  $data = openssl_random_pseudo_bytes(16);
+  
+  $data[6] = chr(ord($data[6]) & 0x0f | 0x40); // set version to 0100
+  $data[8] = chr(ord($data[8]) & 0x3f | 0x80); // set bits 6-7 to 10
+
+  return vsprintf('urn:uuid:%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+}
+
+/**
+ * Construct the triples for the embedded OpenAnnotation SVG selector
+ *
+ */
+function islandora_dss_yohe_oa_selector($rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0, $uuid) {
+
+  $triples = $uuid . ' a oa:SvgSelector, cnt:ContentAsText ;
+cnt:characterEncoding "utf-8" ;
+cnt:chars "' . islandora_dss_yohe_svg_selector($rect_x, $rect_y, $rect_width, $rect_height) . '" .';
+
+  return $triples;
+}
+
+/**
+ * Construct the triples for the OpenAnnotation target
+ *
+ */
+function islandora_dss_yohe_oa_target($page_pid, $book_pid, $selector_uuid) {
+
+  $triples = $page_pid . ' a oa:SpecificResource ;
+oa:hasSource ' . $book_pid . ' ;
+oa:hasSelector ' . $selector_uuid . ' .';
+
+  return $triples;
+}
+
+function islandora_dss_yohe_set_relationships($selector_uuid, $page_pid, $book_pid, $rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0) {
+
+  /*
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
+  islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
+  islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
+  */
+
+  print islandora_dss_yohe_oa_selector($rect_x, $rect_y, $rect_width, $rect_height, $selector_uuid);
+  print islandora_dss_yohe_oa_target($page_pid, $book_pid, $selector_uuid);
+  exit(1);
+
+  return array(islandora_dss_yohe_oa_selector($rect_x, $rect_y, $rect_width, $rect_height),
+	       islandora_dss_yohe_oa_target($page_pid, $book_pid));
+}
+
+function drush_islandora_dss_islandora_yohe_ingest($dir_path, $svg_file_path) {
+
+  if(($svg_file_path = fopen($svg_file_path, "r")) !== FALSE) {
+
+    $ingested_books = array();
+
+    for($i = 0; ($data = fgetcsv($svg_file_path, 1000, ",")) !== FALSE; $i++) {
+
+      // Refactor
+      if($i == 0) {
+
+	continue;
+      }
+
+      $book_label = $data[0];
+      $page_label = $data[1];
+
+      $rect_x = $data[2];
+      $rect_y = $data[3];
+
+      $rect_width = $data[4];
+      $rect_height = $data[5];
+
+      $selector_uuid = islandora_dss_uuid_v4();
+      islandora_dss_yohe_set_relationships($selector_uuid, 'pid1', 'pid2', $rect_x, $rect_y, $rect_width, $rect_height);
+    }
+  }
+
+  /*
+  $rels_ext = $object->relationships;
+
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
+  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
+  islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
+  islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
+  */
+
+}
+
+/**
  * Checks whether the user can access the given object and datastream.
  *
  * This function will validate and use a token if present in the GET parameters.

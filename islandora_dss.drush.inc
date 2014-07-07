@@ -1,4 +1,4 @@
-1;2501;0c<?php
+<?php
 
 function islandora_dss_drush_help($command) {
 
@@ -263,6 +263,19 @@ function islandora_dss_drush_command() {
     array(
 	  'description' => dt('Properly set the Datastream labels for MODS, TN, and PDF Book Object Datastreams'),
 	  'aliases' => array('newspaper-ds-labels'));
+
+  /**
+   * Sam S. Yohe Bushkill Stream Photo Albums tasks
+   *
+   */
+
+  $items['islandora-yohe-ingest'] =
+    array(
+	  'description' => dt('Ingest the digital surrogates for the Sam S. Yohe Bushkill Stream Photo Albums'),
+	  'arguments' => array('arg1' => dt('the directory path for the surrogates'),
+			       'arg2' => dt('the file path for the SVG image metadata'),
+			       ),
+	  'aliases' => array('yohe-in'));
 
   /**
    * Geology Department Slide Collection tasks
