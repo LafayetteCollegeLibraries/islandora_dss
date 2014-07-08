@@ -1,0 +1,72 @@
+<?php
+  /**
+   * @file
+   * Integration test suite for the Yohe Album collection Objects
+   * @author griffinj@lafayette.edu
+   *
+   */
+
+class IslandoraDssIslandoraYoheTestCase extends IslandoraWebTestCase {
+
+  public static function getInfo() {
+
+    return array('name' => 'Islandora DSS Yohe integration test suite',
+                 'description' => 'Integration testing suite for the Sam S. Yohe Bushkill Stream Photo Albums Islandora functionality',
+                 'group' => 'Lafayette College Libraries',
+                 );
+  }
+
+  function setUp() {
+
+    parent::setUp('islandora_basic_collection', 'islandora_dss');
+    $this->repository = $this->admin->repository;
+    $this->purgeTestObjects();
+
+    $this->book_label = 'testBookLabel';
+  }
+
+  public function tearDown() {
+
+    $this->purgeTestObjects();
+    unset($this->repository);
+    parent::tearDown();
+  }
+
+  /**
+   * Purge any objects created by the test's in this class.
+   * @see IslandoraHooksTestCase::purgeTestObjects
+   *
+   */
+  public function purgeTestObjects() {
+    
+    $objects = array();
+
+    if(isset($this->book)) {
+
+      $objects[] = $this->book->id;
+    }
+
+    foreach ($objects as $object) {
+      try {
+
+        $object = $this->repository->getObject($object);
+        $this->repository->purgeObject($object->id);
+      }
+      catch(Exception $e) {
+        // Meh... Either it didn't exist or the purge failed.
+      }
+    }
+  }
+
+  /**
+   * Test the ingestion of a Yohe Album Surrogate
+   */
+  public function testYoheIngestBook() {
+
+    $this->book = islandora_dss_yohe_ingest_book($this->book_label);
+
+    $this->assertNotNull($this->book);
+    $this->assertEqual($this->book->label, $this->book_label);
+    $this->assertEqual($this->book->getParents(), array('islandora:yohe'));
+  }
+  }
