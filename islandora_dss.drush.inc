@@ -1161,7 +1161,8 @@ function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/D
 	$ingested_books[$book_label] = $book->id;
       }
 
-      $file = $dir_path . $book_label;
+      //$file = $dir_path . $book_label;
+      $file = drupal_get_path('module', 'islandora_dss') . '/files/placeholder.tif';
 
       /*
       $selector_uuid = islandora_dss_uuid_v4();
@@ -1175,8 +1176,6 @@ function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/D
 				     $rect_height,
 				     $book);
 
-      exit(1);
-      
     }
   }
 }

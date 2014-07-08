@@ -1284,10 +1284,10 @@ function islandora_dss_object_datastream_access_callback($perm, $object = NULL, 
  */
 function islandora_dss_yohe_svg_selector($rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0) {
 
-  $svg_doc = "<?xml version='1.0'?>
-<svg width='$rect_width' height='$rect_height' viewPort='0 0 $rect_width $rect_height' version='1.1' xmlns='http://www.w3.org/2000/svg'>
+  $svg_doc = new DOMDocument("1.0");
+  $svg_doc->loadXML("<svg width='$rect_width' height='$rect_height' viewPort='0 0 $rect_width $rect_height' version='1.1' xmlns='http://www.w3.org/2000/svg'>
     <rect x='$rect_x' y='$rect_y' width='$rect_width' height='$rect_height'/>
-</svg>";
+</svg>");
 
   return $svg_doc;
 }
@@ -1321,10 +1321,20 @@ function islandora_dss_yohe_oa_selector($rect_x = 0, $rect_y = 0, $rect_width = 
 
   $page_uri = 'info:fedora/' . $page_pid;
 
+  /*
   $triples = array(array(RDF_URI, 'type', 'oa:SvgSelector'),
 		   array(RDF_URI, 'type', 'cnt:ContentAsXML'),
 		   array(RDF_CONTENT_URI, 'cnt:characterEncoding', "utf-8", RELS_TYPE_STRING),
 		   array(RDF_CONTENT_URI, 'cnt:rest', islandora_dss_yohe_svg_selector($rect_x, $rect_y, $rect_width, $rect_height), RELS_TYPE_STRING));
+  */
+
+  $svg_doc = islandora_dss_yohe_svg_selector($rect_x, $rect_y, $rect_width, $rect_height);
+  $svg_element = $svg_doc->documentElement;
+
+  $triples = array(array($page_uri, RDF_URI, 'type', 'oa:SvgSelector'),
+		   array($page_uri, RDF_URI, 'type', 'cnt:ContentAsXML'),
+		   array($page_uri, RDF_CONTENT_URI, 'cnt:characterEncoding', "utf-8", RELS_TYPE_STRING),
+		   array($page_uri, RDF_CONTENT_URI, 'cnt:rest', $svg_element, RELS_TYPE_XML));
 
   return $triples;
 }
@@ -1339,13 +1349,21 @@ function islandora_dss_yohe_oa_target($book_pid, $collection_pid, $page_pid) {
   $book_uri = 'info:fedora/' . $book_pid;
   $collection_uri = 'info:fedora/' . $collection_pid;
 
+  /*
   $triples = array(array(RDF_URI, 'type', 'oa:SpecificResource'),
 		   array(OA_URI, 'hasSource', $collection_uri),
 		   array(OA_URI, 'hasSelector', $page_uri),
 		   );
+  */
+  $triples = array(array($book_uri, RDF_URI, 'type', 'oa:SpecificResource'),
+		   array($book_uri, OA_URI, 'hasSource', $collection_uri),
+		   array($book_uri, OA_URI, 'hasSelector', $page_uri),
+		   );
 
   return $triples;
 }
+
+define("RELS_TYPE_XML", 5);
 
 /**
  * Adding RDF statements to the RELS-EXT datastream with non-Fedora Commons subject terms
@@ -1385,8 +1403,8 @@ function islandora_dss_add_relationship($rels_ext_ds, $subject, $predicate_uri, 
     $xpath->registerNamespace($alias, $uri);
   }
 
-  $description_upper = $xpath->query('/rdf:RDF/rdf:Description[@rdf:about="info:fedora/'.$subject.'"]');
-  $description_lower = $xpath->query('/rdf:RDF/rdf:description[@rdf:about="info:fedora/'.$subject.'"]');
+  $description_upper = $xpath->query('/rdf:RDF/rdf:Description[@rdf:about="'.$subject.'"]');
+  $description_lower = $xpath->query('/rdf:RDF/rdf:description[@rdf:about="'.$subject.'"]');
 
   if ($description_lower->length == 0 && $description_upper->length == 0) {
     $description = $document->createElementNS(RDF_URI, 'Description');
@@ -1401,7 +1419,13 @@ function islandora_dss_add_relationship($rels_ext_ds, $subject, $predicate_uri, 
 
   $relationship = $document->createElementNS($predicate_uri, $predicate);
   $description->appendChild($relationship);
-  if ($type != RELS_TYPE_URI) {
+
+  if($type == RELS_TYPE_XML) {
+
+    $object = $document->importNode($object, true);
+    $relationship->appendChild($object);
+  } elseif ($type != RELS_TYPE_URI) {
+
     $relationship->nodeValue = $object;
   }
 
@@ -1423,6 +1447,19 @@ function islandora_dss_add_relationship($rels_ext_ds, $subject, $predicate_uri, 
     break;
   }
 
+  // griffinj
+  // Remove me
+  print_r($document->saveXML());
+  print "\n";
+  //exit(1);
+
+  /*
+  if($object == 'oa:SvgSelector') {
+
+    exit(1);
+  }
+  */
+
   $rels_ext_ds->content = $document->saveXml();
 }
 
@@ -1430,12 +1467,18 @@ function islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $re
 
   foreach(islandora_dss_yohe_oa_selector($rect_x, $rect_y, $rect_width, $rect_height, $page->id) as $params) {
 
-    call_user_func_array(array($page->relationships, "add"), $params);
+    //call_user_func_array(array($page->relationships, "add"), $params);
+
+    array_unshift($params, $page['RELS-EXT']);
+    call_user_func_array('islandora_dss_add_relationship', $params);
   }
 
   foreach(islandora_dss_yohe_oa_target($book->id, $collection_pid, $page->id) as $params) {
 
-    call_user_func_array(array($book->relationships, "add"), $params);
+    //call_user_func_array(array($book->relationships, "add"), $params);
+
+    array_unshift($params, $book['RELS-EXT']);
+    call_user_func_array('islandora_dss_add_relationship', $params);
   }
 }
 
@@ -1487,13 +1530,13 @@ function islandora_dss_yohe_ingest_page($file,
    * Ingest the Page Object (to which metadata can be appended)
    *
    */
-  $page = islandora_dss_book_page_ingest($file, $book->id, NULL, $page_label);
-  //$page = islandora_object_load('changeme:25');
+  //$page = islandora_dss_book_page_ingest($file, $book->id, NULL, $page_label);
+  $page = islandora_object_load('changeme:28');
   
   $collections = $book->getParents();
   $collection_pid = array_shift($collections);
 
-  //islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $page->id, $book->id, $rect_x, $rect_y, $rect_width, $rect_height);
+  islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $page->id, $book->id, $rect_x, $rect_y, $rect_width, $rect_height);
 }
 
 /**
