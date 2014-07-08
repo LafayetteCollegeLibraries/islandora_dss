@@ -1,0 +1,88 @@
+<?php
+
+  /**
+   * @file
+   * Test suite for the Sam S. Yohe Bushkill Stream Photo Albums functionality
+   * @author griffinj@lafayette.edu
+   *
+   */
+
+class IslandoraDssYoheTestCase extends DrupalUnitTestCase {
+
+  public static function getInfo() {
+
+    return array('name' => 'Islandora DSS Yohe test suite',
+                 'description' => 'Test suite for the Sam S. Yohe Bushkill Stream Photo Albums functionality',
+                 'group' => 'Lafayette College Libraries',
+                 );
+  }
+
+  function setUp() {
+
+    parent::setUp('islandora_dss');
+
+    $this->rect_x = 0;
+    $this->rect_y = 0;
+    $this->rect_width = 0;
+    $this->rect_height = 0;
+    $this->selector_uuid = "urn:uuid:";
+
+    $this->book_pid = "yohe:1";
+    $this->page_pid = "islandora:2";
+  }
+
+  public function tearDown() {
+
+    parent::tearDown();
+  }
+
+  /**
+   * For generating the SVG Document
+   *
+   */
+  public function testSvgSelector() {
+
+    $this->assertIdentical(islandora_dss_yohe_svg_selector($this->rect_x,
+							   $this->rect_y,
+							   $this->rect_width,
+							   $this->rect_height),
+			   "<?xml version='1.0'?>
+<svg width='$this->rect_width' height='$this->rect_height' viewPort='0 0 $this->rect_width $this->rect_height' version='1.1' xmlns='http://www.w3.org/2000/svg'>
+    <rect x='$this->rect_x' y='$this->rect_y' width='$this->rect_width' height='$this->rect_height'/>
+</svg>");
+  }
+
+  /**
+   * For generating the OpenAnnotation selector RDF triples
+   *
+   */
+  public function testOaSelector() {
+
+    $this->assertIdentical(islandora_dss_yohe_oa_selector($this->rect_x,
+							  $this->rect_y,
+							  $this->rect_width,
+							  $this->rect_height,
+							  $this->selector_uuid),
+
+			   $this->selector_uuid . ' a oa:SvgSelector, cnt:ContentAsText ;
+cnt:characterEncoding "utf-8" ;
+cnt:chars "' . "<?xml version='1.0'?>
+<svg width='$this->rect_width' height='$this->rect_height' viewPort='0 0 $this->rect_width $this->rect_height' version='1.1' xmlns='http://www.w3.org/2000/svg'>
+    <rect x='$this->rect_x' y='$this->rect_y' width='$this->rect_width' height='$this->rect_height'/>
+</svg>"  . '" .');
+  }
+
+  /**
+   * For generating the OpenAnnotation target RDF triples
+   *
+   */
+  function testOaTarget() {
+
+    $this->assertIdentical(islandora_dss_yohe_oa_target($this->page_pid,
+							$this->book_pid,
+							$this->selector_uuid),
+			   $this->page_pid . ' a oa:SpecificResource ;
+oa:hasSource ' . $this->book_pid . ' ;
+oa:hasSelector ' . $this->selector_uuid . ' .');
+  }
+  }
