@@ -1114,7 +1114,7 @@ function islandora_dss_book_derive($object) {
  * @see islandora_book_upload_page_form_submit()
  * @see islandora_prepare_new_object()
  */
-function islandora_dss_book_page_ingest($file, $book_pid, $object_pid = NULL, $language = 'en-US') {
+function islandora_dss_book_page_ingest($file, $book_pid, $object_pid = NULL, $label = NULL, $language = 'en-US') {
 
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
 
@@ -1127,10 +1127,17 @@ function islandora_dss_book_page_ingest($file, $book_pid, $object_pid = NULL, $l
     //$object = new IslandoraNewFedoraObject(NULL, $tuque->repository);
     $object = $tuque->repository->constructObject();
   }
+  
+  if(isset($label)) {
 
+    $object->label = $label;
+  } else {
 
-  $object->label = $file->filename;
-  islandora_paged_content_update_datastream($object, drupal_realpath($file->uri), 'OBJ', NULL, NULL, 'M', FALSE);
+    $filename = property_exists($file, 'filename') ? $file->filename : $file;
+    $object->label = $filename;
+  }
+
+  islandora_paged_content_update_datastream($object, drupal_realpath(property_exists($file, 'uri') ? $file->uri : $file ), 'OBJ', NULL, NULL, 'M', FALSE);
   // Update RELS-EXT properties, page/sequence/etc, and append the page at the
   // end of the book.
   $rels_ext = $object->relationships;
@@ -1275,7 +1282,6 @@ function islandora_dss_object_datastream_access_callback($perm, $object = NULL, 
  * Ingestion for the Yohe photograph album surrogates
  *
  */
-
 function islandora_dss_yohe_svg_selector($rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0) {
 
   $svg_doc = "<?xml version='1.0'?>
@@ -1304,15 +1310,21 @@ function islandora_dss_uuid_v4() {
   return vsprintf('urn:uuid:%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
 }
 
+define("OA_URI", 'http://www.w3.org/ns/oa#');
+define("RDF_CONTENT_URI", 'http://www.w3.org/2011/content#');
+
 /**
  * Construct the triples for the embedded OpenAnnotation SVG selector
  *
  */
-function islandora_dss_yohe_oa_selector($rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0, $uuid) {
+function islandora_dss_yohe_oa_selector($rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0, $page_pid) {
 
-  $triples = $uuid . ' a oa:SvgSelector, cnt:ContentAsText ;
-cnt:characterEncoding "utf-8" ;
-cnt:chars "' . islandora_dss_yohe_svg_selector($rect_x, $rect_y, $rect_width, $rect_height) . '" .';
+  $page_uri = 'info:fedora/' . $page_pid;
+
+  $triples = array(array(RDF_URI, 'type', 'oa:SvgSelector'),
+		   array(RDF_URI, 'type', 'cnt:ContentAsXML'),
+		   array(RDF_CONTENT_URI, 'cnt:characterEncoding', "utf-8", RELS_TYPE_STRING),
+		   array(RDF_CONTENT_URI, 'cnt:rest', islandora_dss_yohe_svg_selector($rect_x, $rect_y, $rect_width, $rect_height), RELS_TYPE_STRING));
 
   return $triples;
 }
@@ -1321,75 +1333,167 @@ cnt:chars "' . islandora_dss_yohe_svg_selector($rect_x, $rect_y, $rect_width, $r
  * Construct the triples for the OpenAnnotation target
  *
  */
-function islandora_dss_yohe_oa_target($page_pid, $book_pid, $selector_uuid) {
+function islandora_dss_yohe_oa_target($book_pid, $collection_pid, $page_pid) {
 
-  $triples = $page_pid . ' a oa:SpecificResource ;
-oa:hasSource ' . $book_pid . ' ;
-oa:hasSelector ' . $selector_uuid . ' .';
+  $page_uri = 'info:fedora/' . $page_pid;
+  $book_uri = 'info:fedora/' . $book_pid;
+  $collection_uri = 'info:fedora/' . $collection_pid;
+
+  $triples = array(array(RDF_URI, 'type', 'oa:SpecificResource'),
+		   array(OA_URI, 'hasSource', $collection_uri),
+		   array(OA_URI, 'hasSelector', $page_uri),
+		   );
 
   return $triples;
 }
 
-function islandora_dss_yohe_set_relationships($selector_uuid, $page_pid, $book_pid, $rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0) {
+/**
+ * Adding RDF statements to the RELS-EXT datastream with non-Fedora Commons subject terms
+ *
+ */
+function islandora_dss_add_relationship($rels_ext_ds, $subject, $predicate_uri, $predicate, $object, $type = RELS_TYPE_URI) {
 
-  /*
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
-  islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
-  islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
-  */
+  $type = intval($type);
 
-  print islandora_dss_yohe_oa_selector($rect_x, $rect_y, $rect_width, $rect_height, $selector_uuid);
-  print islandora_dss_yohe_oa_target($page_pid, $book_pid, $selector_uuid);
-  exit(1);
+  /**
+   * @see FedoraRelationships
+   *
+   */
+  $namespaces = array('rdf' => RDF_URI,
+		      'fedora' => FEDORA_RELS_EXT_URI,
+		      'fedora-model' => FEDORA_MODEL_URI,
+		      'islandora' => ISLANDORA_RELS_EXT_URI,
+		      'oa' => OA_URI,
+		      'cnt' => RDF_CONTENT_URI
+		      );
 
-  return array(islandora_dss_yohe_oa_selector($rect_x, $rect_y, $rect_width, $rect_height),
-	       islandora_dss_yohe_oa_target($page_pid, $book_pid));
-}
+  /**
+   * @see FedoraRelationships::getDom
+   *
+   */
+  $document = new DomDocument();
+  $document->preserveWhiteSpace = FALSE;
+  $document->loadXml($rels_ext_ds->content);
 
-function drush_islandora_dss_islandora_yohe_ingest($dir_path, $svg_file_path) {
+  /**
+   * @see FedoraRelationships::getXpath
+   *
+   */
+  $xpath = new DomXPath($document);
+  foreach ($namespaces as $alias => $uri) {
 
-  if(($svg_file_path = fopen($svg_file_path, "r")) !== FALSE) {
-
-    $ingested_books = array();
-
-    for($i = 0; ($data = fgetcsv($svg_file_path, 1000, ",")) !== FALSE; $i++) {
-
-      // Refactor
-      if($i == 0) {
-
-	continue;
-      }
-
-      $book_label = $data[0];
-      $page_label = $data[1];
-
-      $rect_x = $data[2];
-      $rect_y = $data[3];
-
-      $rect_width = $data[4];
-      $rect_height = $data[5];
-
-      $selector_uuid = islandora_dss_uuid_v4();
-      islandora_dss_yohe_set_relationships($selector_uuid, 'pid1', 'pid2', $rect_x, $rect_y, $rect_width, $rect_height);
-    }
+    $xpath->registerNamespace($alias, $uri);
   }
 
-  /*
-  $rels_ext = $object->relationships;
+  $description_upper = $xpath->query('/rdf:RDF/rdf:Description[@rdf:about="info:fedora/'.$subject.'"]');
+  $description_lower = $xpath->query('/rdf:RDF/rdf:description[@rdf:about="info:fedora/'.$subject.'"]');
 
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
-  islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
-  islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
-  */
+  if ($description_lower->length == 0 && $description_upper->length == 0) {
+    $description = $document->createElementNS(RDF_URI, 'Description');
+    $document->documentElement->appendChild($description);
+    $description->setAttributeNS(RDF_URI, 'rdf:about', $subject);
+  }
+  elseif($description_lower->length) {
+    $description = $description_lower->item(0);
+  } else {
+    $description = $description_upper->item(0);
+  }
 
+  $relationship = $document->createElementNS($predicate_uri, $predicate);
+  $description->appendChild($relationship);
+  if ($type != RELS_TYPE_URI) {
+    $relationship->nodeValue = $object;
+  }
+
+  switch ($type) {
+  case RELS_TYPE_URI:
+    $relationship->setAttributeNS(RDF_URI, 'rdf:resource', $object);
+    break;
+
+  case RELS_TYPE_STRING:
+    $relationship->setAttribute('rdf:datatype', 'http://www.w3.org/2001/XMLSchema#string');
+    break;
+
+  case RELS_TYPE_INT:
+    $relationship->setAttribute('rdf:datatype', 'http://www.w3.org/2001/XMLSchema#int');
+    break;
+
+  case RELS_TYPE_DATETIME:
+    $relationship->setAttribute('rdf:datatype', 'http://www.w3.org/2001/XMLSchema#dateTime');
+    break;
+  }
+
+  $rels_ext_ds->content = $document->saveXml();
+}
+
+function islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0) {
+
+  foreach(islandora_dss_yohe_oa_selector($rect_x, $rect_y, $rect_width, $rect_height, $page->id) as $params) {
+
+    call_user_func_array(array($page->relationships, "add"), $params);
+  }
+
+  foreach(islandora_dss_yohe_oa_target($book->id, $collection_pid, $page->id) as $params) {
+
+    call_user_func_array(array($book->relationships, "add"), $params);
+  }
+}
+
+/**
+ * Ingest a Book Album
+ * @todo Refactor this for a general book ingestion function
+ *
+ */
+function islandora_dss_yohe_ingest_book($label, $collections = array('islandora:yohe')) {
+
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  module_load_include('inc', 'islandora_pdf', 'includes/derivatives');
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  $id = isset($namespace) ? $namespace : 'islandora';
+
+  $relationship_map = function($o) {
+    return array('relationship' => 'isMemberOfCollection', 'pid' => $o);
+  };
+  $relationships = empty($collections) ? array() : array_map($relationship_map, $collections);
+
+  $book = islandora_prepare_new_object($id, $label, array(), array('islandora:bookCModel'), $relationships);
+
+  islandora_add_object($book);
+  return $book;
+}
+
+function islandora_dss_yohe_ingest_page($file,
+					$page_label,
+					$rect_x,
+					$rect_y,
+					$rect_width,
+					$rect_height,
+					$book,
+					$selector_uuid = NULL) {
+
+  /**
+   * Generate the UUID for the OA selector if this has not been passed
+   *
+   */
+  if(!isset($selector_uuid)) {
+
+    $selector_uuid = islandora_dss_uuid_v4();
+  }
+
+  /**
+   * Ingest the Page Object (to which metadata can be appended)
+   *
+   */
+  $page = islandora_dss_book_page_ingest($file, $book->id, NULL, $page_label);
+  //$page = islandora_object_load('changeme:25');
+  
+  $collections = $book->getParents();
+  $collection_pid = array_shift($collections);
+
+  //islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $page->id, $book->id, $rect_x, $rect_y, $rect_width, $rect_height);
 }
 
 /**

@@ -1123,6 +1123,65 @@ function drush_islandora_dss_islandora_book_newspaper_ingest($csv_file, $collect
 }
 
 /**
+ * Ingesting Yohe Album derivatives
+ *
+ */
+function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/DSS-production/yohe_albums/TIFF', $svg_file_path = 'YoheSVGareaSelectors.csv') {
+
+  if(($svg_file_path = fopen($svg_file_path, "r")) !== FALSE) {
+
+    $ingested_books = array();
+
+    for($i = 0; ($data = fgetcsv($svg_file_path, 1000, ",")) !== FALSE; $i++) {
+
+      // Refactor
+      if($i == 0) {
+
+	continue;
+      }
+
+      $book_label = $data[0];
+      $page_label = $data[1];
+
+      $rect_x = $data[2];
+      $rect_y = $data[3];
+
+      $rect_width = $data[4];
+      $rect_height = $data[5];
+
+      // Retrieve the Book Object if it's been ingested...
+      if(array_key_exists($book_label, $ingested_books)) {
+
+	$book = islandora_object_load($ingested_books[$book_label]);
+      } else {
+
+	// ...and ingest it if it hasn't
+
+	$book = islandora_dss_yohe_ingest_book($book_label);
+	$ingested_books[$book_label] = $book->id;
+      }
+
+      $file = $dir_path . $book_label;
+
+      /*
+      $selector_uuid = islandora_dss_uuid_v4();
+      islandora_dss_yohe_set_relationships($selector_uuid, 'pid1', 'pid2', $rect_x, $rect_y, $rect_width, $rect_height);
+      */
+      islandora_dss_yohe_ingest_page($file,
+				     $page_label,
+				     $rect_x,
+				     $rect_y,
+				     $rect_width,
+				     $rect_height,
+				     $book);
+
+      exit(1);
+      
+    }
+  }
+}
+
+/**
  * Islandora Book Object tasks
  *
  */

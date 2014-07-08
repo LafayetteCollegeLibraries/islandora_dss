@@ -7,6 +7,7 @@ core = 7.x
 
 ; The unit test suites
 files[] = tests/simpletest/unit/yohe.test
+files[] = tests/simpletest/islandora/yohe_islandora.test
 
 ; This must be specified for unit testing
 testing_api = 2.x
