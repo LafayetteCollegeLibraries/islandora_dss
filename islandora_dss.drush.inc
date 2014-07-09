@@ -1215,14 +1215,19 @@ function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/D
       $book_collection_pid = str_replace('-', '', $m[0]);
       $album_collection_pid = str_replace('-', '', $m[1]);
 
+      // Get the connection
+      $connection = islandora_get_tuque_connection(user_load(1));
+
+      $root_collection = islandora_object_load('islandora:root');
+      $yohe_collection = islandora_dss_get_collection('islandora:yohe', 'Sam S. Yohe Bushkill Stream Photo Albums', $root_collection, 'yohe');
+
       drush_log('Ingesting the collection Object for the physical Yohe Album...', 'ok');
-      $yohe_collection = islandora_object_load('islandora:yohe');
-      $album_collection = islandora_dss_create_collection($album_collection_pid, $m[0], $yohe_collection, 'yohe');
+      $album_collection = islandora_dss_get_collection($album_collection_pid, $m[0], $yohe_collection, 'yohe');
       drush_log('Ingested the collection Object for the physical Yohe Album', 'success');
 
       drush_log('Ingesting the collection Object for the physical Yohe Album page spread...', 'ok');
       $content_models = array('islandora:bookCModel' => array('label' => 'Islandora Internet Archive Book Content Model'));
-      islandora_dss_create_collection($book_collection_pid, $m[1], $album_collection, 'yohe', $content_models);
+      islandora_dss_get_collection($book_collection_pid, $m[1], $album_collection, 'yohe', $content_models);
       drush_log('Ingested the collection Object for the physical Yohe Album page spread', 'success');
 
       // Retrieve the Book Object if it's been ingested...
