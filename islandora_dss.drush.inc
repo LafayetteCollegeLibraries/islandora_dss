@@ -202,6 +202,11 @@ function islandora_dss_drush_command() {
 	  'description' => dt('Ingest thumbnails for any given Islandora Book Object'),
 	  'aliases' => array('book-ingest-tn'));
 
+  $items['islandora-book-elc-ingest'] =
+    array(
+	  'description' => dt(''),
+	  'aliases' => array('Ingest ELC ledgers as Book Objects'));
+
   $items['islandora-book-newspaper-ingest'] =
     array(
 	  'description' => dt(''),
@@ -382,6 +387,8 @@ function drush_islandora_dss_get_object() {
 
 function drush_islandora_dss_generate_image_ds($object, $image_file_path, $args, $ds_name, $ds_label, $image_file_ext='tif') {
 
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+
   $base_name = str_replace(':', '-', $object->id);
 
   $mime_detector = new MimeDetect();
@@ -423,6 +430,8 @@ function drush_islandora_dss_generate_image_ds($object, $image_file_path, $args,
  */
 function drush_islandora_dss_generate_jp2_ds($object, $image_file_path, $image_file_ext='tif') {
 
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+
   // This results in an error
   //$derivative_file = islandora_dss_image_imagemagick_convert($file_path, $jp2_file_path, islandora_large_image_get_args());
 
@@ -448,6 +457,8 @@ function drush_islandora_dss_generate_jp2_ds($object, $image_file_path, $image_f
  *
  */
 function drush_islandora_dss_generate_jpg_ds($object, $image_file_path, $image_file_ext='tif') {
+
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
 
   // Thumbnail generation
   $base_name = str_replace(':', '-', $object->id);
@@ -479,17 +490,11 @@ function drush_islandora_dss_generate_jpg_ds($object, $image_file_path, $image_f
  */
 function drush_islandora_dss_generate_tn_ds($object, $image_file_path, $image_file_ext='tif') {
 
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+
   // Thumbnail generation
   $base_name = str_replace(':', '-', $object->id);
   $derivative_file = "/tmp/{$base_name}_TN.png";
-
-  /*
-  print_r(implode(' ', array_merge(array('/usr/bin/convert', "$image_file_ext:" . $image_file_path),
-				   array('-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75)),
-					 '-resize ' . escapeshellarg("200 x 200")),
-				   array('png:' . $derivative_file))));
-  exit(1);
-  */
 
   shell_exec(implode(' ', array_merge(array('/usr/bin/convert', "$image_file_ext:" . $image_file_path),
 				      array('-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75)),
@@ -546,7 +551,7 @@ function drush_islandora_dss_islandora_ingest_page($book_pid, $file_path, $url='
   $obj_ds = $object->constructDatastream('OBJ', 'M');
   $obj_ds->setContentFromFile($file_path);
   $obj_ds->mimetype = 'image/tiff';
-  //$object->ingestDatastream($obj_ds);
+  $object->ingestDatastream($obj_ds);
 
   $base_name = str_replace(':', '-', $object->id);
 
@@ -557,12 +562,6 @@ function drush_islandora_dss_islandora_ingest_page($book_pid, $file_path, $url='
   $jp2_file_path = "temporary://{$base_name}_JP2.jp2";
 
   // Objects are mutable
-  /*
-  drush_islandora_dss_generate_tn_ds($object, $file_path);
-  drush_islandora_dss_generate_jpg_ds($object, $file_path);
-  drush_islandora_dss_generate_jp2_ds($object, $file_path);
-  */
-
   drush_islandora_dss_generate_image_ds($object, $file_path,
 					array('-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75)),
 					      '-resize ' . escapeshellarg("200 x 200")), 'TN', 'Thumbnail');
@@ -1043,6 +1042,64 @@ function drush_islandora_dss_islandora_append_mods_xml($date_value) {
  * @see islandora_ingest_form_prepare_new_object()
  *
  */
+function drush_islandora_dss_islandora_book_elc_ingest($dir_path, $label, $book_pid = NULL, $start = NULL, $collections = array('islandora:elc'), $namespace = 'elc') {
+
+  // Get the connection
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  module_load_include('inc', 'islandora_pdf', 'includes/derivatives');
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  // Abstract and refactor
+  if(!isset($book_pid)) {
+
+    // ID is more specific than namespace so it will take precedence.
+    $id = isset($namespace) ? $namespace : 'islandora';
+
+    $relationship_map = function($o) {
+      return array('relationship' => 'isMemberOfCollection', 'pid' => $o);
+    };
+    $relationships = empty($collections) ? array() : array_map($relationship_map, $collections);
+    
+    drush_log(t("Ingesting a new Book Object for $label..."), 'ok');
+    
+    $elc_ledger = islandora_prepare_new_object($id, $label, array(), array('islandora:bookCModel'), $relationships);
+    islandora_add_object($elc_ledger);
+    drush_log(t("Ingested $label into the Book Object {$elc_ledger->id}"), 'success');
+    
+    $book_pid = $elc_ledger->id;
+  }
+
+  $ledger_files = file_scan_directory($dir_path, '/\.tif/');
+  sort($ledger_files);
+  foreach($ledger_files as $key => $file) {
+
+    if(!isset($start) or $key >= $start) {
+
+      $file_name = basename($file->uri);
+
+      if(!preg_match('/(ELCv\d)_(.+?)\.tif/', $file_name, $m)) {
+
+	exit(1);
+      } else {
+
+	$page_pid = $m[1] . ':' . $m[2];
+	drush_log("Ingesting {$file->uri} as $page_pid and appending it to $book_pid...", 'ok');
+	islandora_dss_book_page_ingest($file, $book_pid, $file_name, $page_pid);
+      }
+    }
+  }
+
+  drush_log(t("Generating the thumbnail for {$elc_ledger->id}..."), 'ok');
+  islandora_paged_content_update_paged_content_thumbnail($book_object);
+  drush_log(t("Generated the thumbnail for {$elc_ledger->id}"), 'success');
+}
+
+/**
+ * @see islandora_ingest_form_prepare_new_object()
+ *
+ */
 function islandora_dss_islandora_book_newspaper_ingest($file_name, $date_issued_timestamp, $subject = 'The Lafayette (1884-)', $collections = array('islandora:newspaper'), $namespace = 'newspaper') {
 
   // Get the connection
@@ -1066,7 +1123,8 @@ function islandora_dss_islandora_book_newspaper_ingest($file_name, $date_issued_
   };
   $relationships = empty($collections) ? array() : array_map($relationship_map, $collections);
 
-  drush_log(t("Ingesting a new Book Object..."), 'ok');
+  drush_log(t("Ingesting $file_name into the Book Object {$newspaper->id}..."), 'ok');
+  
   $newspaper = islandora_prepare_new_object($id, $label, array(), array('islandora:bookCModel'), $relationships);
   islandora_add_object($newspaper);
   drush_log(t("Ingested $file_name into the Book Object {$newspaper->id}"), 'success');
@@ -1156,18 +1214,18 @@ function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/D
       } else {
 
 	// ...and ingest it if it hasn't
-
-	$book = islandora_dss_yohe_ingest_book($book_label);
+	$book_file = $dir_path . $book_label;
+	$book = islandora_dss_yohe_ingest_book($book_label, $book_file);
 	$ingested_books[$book_label] = $book->id;
       }
 
-      $file = $dir_path . $book_label;
+      $page_file = drupal_get_path('module', 'islandora_dss') . '/files/placeholder.tif';
 
       /*
       $selector_uuid = islandora_dss_uuid_v4();
       islandora_dss_yohe_set_relationships($selector_uuid, 'pid1', 'pid2', $rect_x, $rect_y, $rect_width, $rect_height);
       */
-      islandora_dss_yohe_ingest_page($file,
+      islandora_dss_yohe_ingest_page($page_file,
 				     $page_label,
 				     $rect_x,
 				     $rect_y,
@@ -1175,8 +1233,6 @@ function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/D
 				     $rect_height,
 				     $book);
 
-      exit(1);
-      
     }
   }
 }
