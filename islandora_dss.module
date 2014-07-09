@@ -1114,20 +1114,20 @@ function islandora_dss_book_derive($object) {
  * @see islandora_book_upload_page_form_submit()
  * @see islandora_prepare_new_object()
  */
-function islandora_dss_book_page_ingest($file, $book_pid, $object_pid = NULL, $label = NULL, $language = 'en-US') {
+function islandora_dss_book_page_ingest($file, $book_pid, $label = NULL, $page_pid = NULL, $language = 'en-US') {
 
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+  
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  if(isset($page_pid)) {
 
-  if(isset($object_pid)) {
-
-    $object = islandora_object_load($object_pid);
+    $object = $tuque->repository->constructObject($page_pid);
   } else {
 
-    $tuque = islandora_get_tuque_connection(user_load(1));
-    //$object = new IslandoraNewFedoraObject(NULL, $tuque->repository);
-    $object = $tuque->repository->constructObject();
+    // The namespace is retrieved from the PID passed as a parameter to the constructObject() method
+    $object = $tuque->repository->constructObject('islandora');
   }
-  
+
   if(isset($label)) {
 
     $object->label = $label;
@@ -1137,7 +1137,13 @@ function islandora_dss_book_page_ingest($file, $book_pid, $object_pid = NULL, $l
     $object->label = $filename;
   }
 
+  // Refactor and move into islandora_dss.drush.inc...
+  drush_log("Ingesting the Object {$object->id}...", 'ok');
+
   islandora_paged_content_update_datastream($object, drupal_realpath(property_exists($file, 'uri') ? $file->uri : $file ), 'OBJ', NULL, NULL, 'M', FALSE);
+
+  drush_log("Ingested the file", 'success');
+
   // Update RELS-EXT properties, page/sequence/etc, and append the page at the
   // end of the book.
   $rels_ext = $object->relationships;
@@ -1149,14 +1155,23 @@ function islandora_dss_book_page_ingest($file, $book_pid, $object_pid = NULL, $l
 
   $pages = islandora_paged_content_get_pages($book);
 
+  /**
+   * @author griffinj@lafayette.edu
+   * This appears to be a deprecated block of code from the migration processes (ContentDM)
+   * This was likely related to cases in which extraneous pages were, for some unidentified reason, being appended to Book Objects
+   */
+
+  /*
   if(count($pages) > 1) {
 
     $last_page = array_pop($pages);
     $last_page = islandora_object_load($last_page['pid']);
     $last_page->delete();
   }
+  */
 
   $num_pages = count($pages) + 1;
+
   islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
   islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
   islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
@@ -1167,7 +1182,12 @@ function islandora_dss_book_page_ingest($file, $book_pid, $object_pid = NULL, $l
 
   islandora_add_object($object);
 
-  return islandora_dss_book_derive($object);
+  // Refactor and move into islandora_dss.drush.inc...
+  drush_log("Ingested the Object {$object->id}", 'success');
+
+  drush_log("Generating the derivatives for {$object->id}...", 'ok');
+  islandora_dss_book_derive($object);
+  drush_log("Generated the derivatives for {$object->id}", 'success');
 }
 
 function islandora_dss_strip_ellipsis($collection_name) {
@@ -1487,7 +1507,7 @@ function islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $re
  * @todo Refactor this for a general book ingestion function
  *
  */
-function islandora_dss_yohe_ingest_book($label, $collections = array('islandora:yohe')) {
+function islandora_dss_yohe_ingest_book($label, $file_path, $collections = array('islandora:yohe')) {
 
   $connection = islandora_get_tuque_connection(user_load(1));
 
@@ -1495,16 +1515,45 @@ function islandora_dss_yohe_ingest_book($label, $collections = array('islandora:
   module_load_include('inc', 'islandora_pdf', 'includes/derivatives');
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
 
-  $id = isset($namespace) ? $namespace : 'islandora';
-
   $relationship_map = function($o) {
     return array('relationship' => 'isMemberOfCollection', 'pid' => $o);
   };
   $relationships = empty($collections) ? array() : array_map($relationship_map, $collections);
 
-  $book = islandora_prepare_new_object($id, $label, array(), array('islandora:bookCModel'), $relationships);
+  // Refactor and move into islandora_dss.drush.inc...
+  drush_log("Ingesting the Yohe Album page into an Islandora Book...", 'ok');
+
+  $book = islandora_prepare_new_object('yohe', $label, array(), array('islandora:bookCModel'), $relationships);
 
   islandora_add_object($book);
+
+  // Refactor and move into islandora_dss.drush.inc...
+  drush_log("Ingested the Yohe Album page into the Islandora Book {$book->id}...", 'success');
+
+  /**
+   * Manage the surrogate for the physical page as an Islandora Book
+   * This permits multiple notes and related materials to be aggregated within a common Content Model
+   *
+   */
+  $obj_ds = $book->constructDatastream('OBJ', 'M');
+  $obj_ds->setContentFromFile($file_path);
+  $obj_ds->mimetype = 'image/tiff';
+  $book->ingestDatastream($obj_ds);
+
+  /**
+   * Generate the JPEG2000 and other derivatives for the Book Object itself (as this shall be the image which is primarily rendered using OpenSeadragon
+   *
+   */
+  drush_islandora_dss_generate_image_ds($book, $file_path,
+					array('-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75)),
+					      '-resize ' . escapeshellarg("200 x 200")), 'TN', 'Thumbnail');
+
+  drush_islandora_dss_generate_image_ds($book, $file_path,
+					array('-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75)),
+					      '-resize ' . escapeshellarg("600 x 800")), 'JPG', 'Medium sized JPEG');
+  drush_islandora_dss_generate_image_ds($book, $file_path, islandora_large_image_get_args(), 'JP2', 'JPEG 2000');
+
+
   return $book;
 }
 
@@ -1518,21 +1567,11 @@ function islandora_dss_yohe_ingest_page($file,
 					$selector_uuid = NULL) {
 
   /**
-   * Generate the UUID for the OA selector if this has not been passed
-   *
-   */
-  if(!isset($selector_uuid)) {
-
-    $selector_uuid = islandora_dss_uuid_v4();
-  }
-
-  /**
    * Ingest the Page Object (to which metadata can be appended)
    *
    */
-  //$page = islandora_dss_book_page_ingest($file, $book->id, NULL, $page_label);
-  $page = islandora_object_load('changeme:28');
-  
+  $page = islandora_dss_book_page_ingest($file, $book->id, $page_label);
+
   $collections = $book->getParents();
   $collection_pid = array_shift($collections);
 
