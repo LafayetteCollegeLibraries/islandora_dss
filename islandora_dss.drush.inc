@@ -1218,6 +1218,11 @@ function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/D
 	$ingested_books[$book_label] = $book->id;
       }
 
+      /*
+      $tuque = islandora_get_tuque_connection(user_load(1));
+      $book = islandora_object_load('yohe:3');
+      */
+
       $page_file = drupal_get_path('module', 'islandora_dss') . '/files/placeholder.tif';
 
       /*

@@ -1117,8 +1117,9 @@ function islandora_dss_book_derive($object) {
 function islandora_dss_book_page_ingest($file, $book_pid, $label = NULL, $page_pid = NULL, $language = 'en-US') {
 
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
-  
+
   $tuque = islandora_get_tuque_connection(user_load(1));
+
   if(isset($page_pid)) {
 
     $object = $tuque->repository->constructObject($page_pid);
@@ -1141,8 +1142,6 @@ function islandora_dss_book_page_ingest($file, $book_pid, $label = NULL, $page_p
   drush_log("Ingesting the Object {$object->id}...", 'ok');
 
   islandora_paged_content_update_datastream($object, drupal_realpath(property_exists($file, 'uri') ? $file->uri : $file ), 'OBJ', NULL, NULL, 'M', FALSE);
-
-  drush_log("Ingested the file", 'success');
 
   // Update RELS-EXT properties, page/sequence/etc, and append the page at the
   // end of the book.
@@ -1188,6 +1187,8 @@ function islandora_dss_book_page_ingest($file, $book_pid, $label = NULL, $page_p
   drush_log("Generating the derivatives for {$object->id}...", 'ok');
   islandora_dss_book_derive($object);
   drush_log("Generated the derivatives for {$object->id}", 'success');
+
+  return $object;
 }
 
 function islandora_dss_strip_ellipsis($collection_name) {
@@ -1352,9 +1353,11 @@ function islandora_dss_yohe_oa_selector($rect_x = 0, $rect_y = 0, $rect_width = 
   $svg_element = $svg_doc->documentElement;
 
   $triples = array(array($page_uri, RDF_URI, 'type', 'oa:SvgSelector'),
-		   array($page_uri, RDF_URI, 'type', 'cnt:ContentAsXML'),
+		   //array($page_uri, RDF_URI, 'type', 'cnt:ContentAsXML'),
+		   array($page_uri, RDF_URI, 'type', 'cnt:ContentAsText'),
 		   array($page_uri, RDF_CONTENT_URI, 'cnt:characterEncoding', "utf-8", RELS_TYPE_STRING),
-		   array($page_uri, RDF_CONTENT_URI, 'cnt:rest', $svg_element, RELS_TYPE_XML));
+		   //array($page_uri, RDF_CONTENT_URI, 'cnt:rest', $svg_element, RELS_TYPE_XML));
+		   array($page_uri, RDF_CONTENT_URI, 'cnt:chars', $svg_doc->saveXML(), RELS_TYPE_STRING));
 
   return $triples;
 }
@@ -1402,7 +1405,8 @@ function islandora_dss_add_relationship($rels_ext_ds, $subject, $predicate_uri, 
 		      'fedora-model' => FEDORA_MODEL_URI,
 		      'islandora' => ISLANDORA_RELS_EXT_URI,
 		      'oa' => OA_URI,
-		      'cnt' => RDF_CONTENT_URI
+		      'cnt' => RDF_CONTENT_URI,
+		      //'xmlns' => 'http://www.w3.org/2000/xmlns/'
 		      );
 
   /**
@@ -1422,6 +1426,22 @@ function islandora_dss_add_relationship($rels_ext_ds, $subject, $predicate_uri, 
 
     $xpath->registerNamespace($alias, $uri);
   }
+
+  /*
+  // Check to see if namespaces have been added...
+
+  foreach(array('oa' => OA_URI,
+		'cnt' => RDF_CONTENT_URI) as $new_ns_prefix => $new_ns_uri) {
+
+    $namespace = $xpath->query('/rdf:RDF[@xmlns:' . $new_ns_prefix . '="' . $new_ns_uri . '"]');
+    if($namespace->length == 0) {
+
+      $document->documentElement->setAttributeNS('http://www.w3.org/2000/xmlns/',
+						 'xmlns:' . $new_ns_prefix,
+						 $new_ns_uri);
+    }
+  }
+  */
 
   $description_upper = $xpath->query('/rdf:RDF/rdf:Description[@rdf:about="'.$subject.'"]');
   $description_lower = $xpath->query('/rdf:RDF/rdf:description[@rdf:about="'.$subject.'"]');
@@ -1455,7 +1475,7 @@ function islandora_dss_add_relationship($rels_ext_ds, $subject, $predicate_uri, 
     break;
 
   case RELS_TYPE_STRING:
-    $relationship->setAttribute('rdf:datatype', 'http://www.w3.org/2001/XMLSchema#string');
+    //$relationship->setAttribute('rdf:datatype', 'http://www.w3.org/2001/XMLSchema#string');
     break;
 
   case RELS_TYPE_INT:
@@ -1465,20 +1485,14 @@ function islandora_dss_add_relationship($rels_ext_ds, $subject, $predicate_uri, 
   case RELS_TYPE_DATETIME:
     $relationship->setAttribute('rdf:datatype', 'http://www.w3.org/2001/XMLSchema#dateTime');
     break;
+
+  case RELS_TYPE_XML:
+    
+    // Fedora Commons does not permit XML literals?
+    //$relationship->setAttribute('rdf:parseType', 'Literal');
+    break;
+
   }
-
-  // griffinj
-  // Remove me
-  print_r($document->saveXML());
-  print "\n";
-  //exit(1);
-
-  /*
-  if($object == 'oa:SvgSelector') {
-
-    exit(1);
-  }
-  */
 
   $rels_ext_ds->content = $document->saveXml();
 }
@@ -1553,7 +1567,6 @@ function islandora_dss_yohe_ingest_book($label, $file_path, $collections = array
 					      '-resize ' . escapeshellarg("600 x 800")), 'JPG', 'Medium sized JPEG');
   drush_islandora_dss_generate_image_ds($book, $file_path, islandora_large_image_get_args(), 'JP2', 'JPEG 2000');
 
-
   return $book;
 }
 
@@ -1575,7 +1588,7 @@ function islandora_dss_yohe_ingest_page($file,
   $collections = $book->getParents();
   $collection_pid = array_shift($collections);
 
-  islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $page->id, $book->id, $rect_x, $rect_y, $rect_width, $rect_height);
+  islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $rect_x, $rect_y, $rect_width, $rect_height);
 }
 
 /**
