@@ -11,7 +11,7 @@
    *
    */
 function islandora_dss_yohe_svg_selector($rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0) {
-  
+
   $svg_doc = new DOMDocument("1.0");
   $svg_doc->loadXML("<svg width='$rect_width' height='$rect_height' viewPort='0 0 $rect_width $rect_height' version='1.1' xmlns='http://www.w3.org/2000/svg'>
     <rect x='$rect_x' y='$rect_y' width='$rect_width' height='$rect_height'/>
@@ -19,6 +19,230 @@ function islandora_dss_yohe_svg_selector($rect_x = 0, $rect_y = 0, $rect_width =
 
   return $svg_doc;
   }
+
+
+
+/**
+ * Calls imagemagick's montage command with the given arguments.
+ *
+ * @author griffinj@lafayette.edu
+ *
+ * @param array $input_files
+ *   The source file URI's of the image files to be concatenated.
+ * @param string $dest
+ *   The destination file uri to convert into.
+ * @param int $width
+ *   The source file to convert from.
+ * @param int $height
+ *   The destination file to convert into.
+ *
+ * @return string
+ *   The destination file path if successful otherwise FALSE.
+ */
+function islandora_dss_montage_convert(array $input_files, $dest, $args) {
+
+  //$src = drupal_realpath($src) . '[0]';
+  $input_files = array_map('drupal_realpath', $input_files);
+
+  $src = implode(' ', $input_files);
+
+  $dest = drupal_realpath($dest);
+  $context = array(
+    'source' => $src,
+    'destination' => $dest,
+  );
+  drupal_alter('montage_arguments', $args, $context);
+
+  $command = $src . ' ' . implode(' ', $args) . ' ' . escapeshellarg($dest);
+  $output = '';
+  $ret = -1;
+
+  /**
+   * Please see the following documentation for the invocation of the binary: http://www.imagemagick.org/Usage/montage/#montage
+   *
+   */
+  if (_islandora_dss_montage_concat_exec($command, $output, $ret) !== TRUE) {
+    $message = 'montage convert failed to create derivative<br/>Error: @ret<br/>Command: @command<br/>Output: @output';
+    $variables = array('@ret' => $ret, '@command' => $command, '@output' => $output);
+    watchdog('islandora_dss', $message, $variables, WATCHDOG_ERROR);
+    return FALSE;
+  }
+  return $dest;
+}
+
+function _islandora_dss_montage_concat_exec($command_args, &$output = NULL, &$error = NULL, $convert_path = NULL) {
+
+  // $convert_path is only passed from the system-wide image toolkit form, on
+  // which the path to convert is configured.
+  // @see _imagemagick_check_path()
+  if (!isset($convert_path)) {
+
+    // By using a default of NULL, we force users to setup the toolkit through
+    // the image toolkit administration UI. Sites enforcing a path via
+    // settings.php should know what they are doing.
+
+    /**
+     * @todo Integrate with admin. UI
+     *
+     */
+    $convert_path = variable_get('montage_concat', '/usr/bin/montage');
+    if (!isset($convert_path)) {
+      return FALSE;
+    }
+  }
+
+  // Use Drupal's root as working directory to resolve relative paths correctly.
+  $drupal_path = DRUPAL_ROOT;
+  
+  /**
+   * @todo Integrate montage support for Windows/IIS
+   *
+   */
+  $command = $convert_path . ' ' . $command_args;
+
+  $descriptors = array(
+    // stdin
+    0 => array('pipe', 'r'),
+    // stdout
+    1 => array('pipe', 'w'),
+    // stderr
+    2 => array('pipe', 'w'),
+  );
+  if ($h = proc_open($command, $descriptors, $pipes, $drupal_path)) {
+    $output = '';
+    while (!feof($pipes[1])) {
+      $output .= fgets($pipes[1]);
+    }
+    $error = '';
+    while (!feof($pipes[2])) {
+      $error .= fgets($pipes[2]);
+    }
+
+    fclose($pipes[0]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $return_code = proc_close($h);
+
+    // Display debugging information to authorized users.
+    if (variable_get('montage_debug', FALSE) && user_access('administer site configuration')) {
+      debug($command, t('montage command'), TRUE);
+      if ($output !== '') {
+        debug($output, t('Montage output'), TRUE);
+      }
+      if ($error !== '') {
+        debug($error, t('Montage error'), TRUE);
+      }
+    }
+
+    // If Montage returned a non-zero code, trigger a PHP error that will
+    // be caught by Drupal's error handler, logged to the watchdog and
+    // eventually displayed to the user if configured to do so.
+    if ($return_code != 0) {
+      // If there is no error message, clarify this.
+      if ($error === '') {
+        $error = t('No error message.');
+      }
+      // Format $error with as full message, passed by reference.
+      $error = t('Montage error @code: !error', array(
+        '@code' => $return_code,
+        '!error' => $error,
+      ));
+      // @todo Use watchdog() instead? Would hide errors from users during
+      //   normal operation, regeardless of error_level setting.
+      trigger_error($error, E_USER_ERROR);
+      // Montage exited with an error code, return it.
+      return $return_code;
+    }
+    // The shell command was executed successfully.
+    return TRUE;
+  }
+  // The shell command could not be executed.
+  return FALSE;
+}
+
+function islandora_dss_yohe_generate_merged_jp2($collection) {
+
+  $results = islandora_basic_collection_get_objects($collection);
+
+  //$jp2_files = array();
+  $child_pids = array();
+
+  foreach($results as $result) {
+
+    /*
+    $child = islandora_object_load($result['object']['value']);
+
+    $base_name = str_replace(':', '-', $child->id);
+
+    $jp2_file = file_save_data($child['JP2']->content, "temporary://{$base_name}_JP2.jp2");
+    $jp2_files[] = $jp2_file->uri;
+    */
+
+    $child_pids[] = $result['object']['value'];
+  }
+
+  $base_name = str_replace(':', '-', $collection->id);
+
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+
+  /*
+  $args = array();
+  $args[] = '-geometry "1x1+0+0<"';
+
+  $concat_file = islandora_dss_montage_convert($jp2_files, "temporary://$base_name_.jp2", $args);
+
+  if ($concat_file === FALSE) {
+
+    drupal_set_message(t('Failed to create JPG derivative'), 'error');
+    drupal_set_message(t('Failed to concatenate JPEG2000 images'), 'error');
+    return FALSE;
+  }
+
+  islandora_large_image_add_datastream($collection, 'JP2', $concat_file, 'image/jp2', t('JPEG 2000'));
+  */
+
+  $ips_url = variable_get('dss_ips_url', 'http://santorini0.dev.lafayette.edu/ips');
+  $repo_url = variable_get('', 'http://localhost:8080/fedora');
+
+  // Instantiate the client
+  $ips = new Ips($ips_url, $repo_url);
+
+  $output_file = file_save_data('', "temporary://$base_name_montage.jp2");
+  $ips->montage($child_pids, 'JP2', array('geometry' => '1x1+0+0<'), $output_file->uri);
+  
+  islandora_large_image_add_datastream($collection, 'JP2', $output_file, 'image/jp2', t('JPEG 2000 Montage'));
+
+  /*
+  // Generate the POST request to the IPS endpoint
+
+  // Instantiate the cURL handler
+  $ch = curl_init();
+
+  $ips_url = variable_get('dss_ips_url', 'http://santorini0.dev.lafayette.edu/ips');
+  $ips_montage_url = $ips_url . '/montage';
+
+  $ips_montage_data = array('repo' => variable_get('', 'http://localhost:8080/fedora'),
+			    'objects' => $child_pids,
+			    'ds' => 'JP2',
+			    'options' => array('geometry' => '')
+			    );
+
+  $post_data = http_build_query($ips_montage_data);
+
+  //set the url, number of POST vars, POST data
+  curl_setopt($ch, CURLOPT_URL, $ips_montage_url);
+  curl_setopt($ch, CURLOPT_POST, count($ips_montage_data));
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $post_data);
+
+  // Transmit the POST request
+  $result = curl_exec($ch);
+
+  // Close the connection
+  curl_close($ch);
+  */
+
+  drush_log("Successfully ingested the concatenated JPEG2000 into the JP2 datastream for {$collection->id}", 'success');
+}
 
 /**
  * Construct the triples for the embedded OpenAnnotation SVG selector
@@ -78,6 +302,8 @@ function islandora_dss_yohe_oa_target($book_pid, $collection_pid, $page_pid) {
  */
 function islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $rect_x = 0, $rect_y = 0, $rect_width = 0, $rect_height = 0) {
 
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
   foreach(islandora_dss_yohe_oa_selector($rect_x, $rect_y, $rect_width, $rect_height, $page->id) as $params) {
 
     //call_user_func_array(array($page->relationships, "add"), $params);
@@ -93,6 +319,14 @@ function islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $re
     array_unshift($params, $book['RELS-EXT']);
     call_user_func_array('islandora_dss_add_relationship', $params);
   }
+
+  $rels = $book->relationships;
+  islandora_paged_content_set_relationship($rels, ISLANDORA_RELS_EXT_URI,
+					   'width', $rect_width, 1
+					   );
+  islandora_paged_content_set_relationship($rels, ISLANDORA_RELS_EXT_URI,
+					   'height', $rect_height, 1
+					   );
 }
 
 /**
@@ -166,6 +400,6 @@ function islandora_dss_yohe_ingest_page($file,
 
   $collections = $book->getParents();
   $collection_pid = array_shift($collections);
-  
+
   islandora_dss_yohe_add_relationships($book, $collection_pid, $page, $rect_x, $rect_y, $rect_width, $rect_height);
 }

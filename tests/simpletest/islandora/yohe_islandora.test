@@ -20,14 +20,14 @@ class IslandoraDssIslandoraYoheTestCase extends IslandoraWebTestCase {
 
     parent::setUp('islandora_basic_collection', 'islandora_dss');
     $this->repository = $this->admin->repository;
-    $this->purgeTestObjects();
+    //$this->purgeTestObjects();
 
     $this->book_label = 'testBookLabel';
   }
 
   public function tearDown() {
 
-    $this->purgeTestObjects();
+    //$this->purgeTestObjects();
     unset($this->repository);
     parent::tearDown();
   }
@@ -63,10 +63,21 @@ class IslandoraDssIslandoraYoheTestCase extends IslandoraWebTestCase {
    */
   public function testYoheIngestBook() {
 
+    /*
     $this->book = islandora_dss_yohe_ingest_book($this->book_label);
 
     $this->assertNotNull($this->book);
     $this->assertEqual($this->book->label, $this->book_label);
     $this->assertEqual($this->book->getParents(), array('islandora:yohe'));
+    */
+  }
+
+  /**
+   * For generating the OpenAnnotation target RDF triples
+   *
+   */
+  public function testGenerateMergedJp2() {
+
+    
   }
   }

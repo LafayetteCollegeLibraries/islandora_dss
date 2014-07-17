@@ -7,6 +7,12 @@
    *
    */
 
+  // Require Composer dependencies
+require 'vendor/autoload.php';
+
+// The IPS API
+require 'libraries/ips/Ips.php';
+
 module_load_include('inc', 'islandora_dss', 'includes/islandora_basic_collection');
 module_load_include('inc', 'islandora_dss', 'includes/dss_yohe');
 
@@ -911,60 +917,6 @@ function islandora_dss_generate_derivative_jpg_book($pid) {
  */
 function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = NULL, $collection_name = NULL, $path_alias = NULL, $is_back = FALSE) {
 
-  /*
-  if (!isset($object['OBJ'])) {
-    drupal_set_message(t('Could not create image derivatives for %s.  No image file was uploaded.', array('%s' => $object->id)), 'error');
-    return FALSE;
-  }
-  $base_name = str_replace(':', '-', $object->id);
-  $uploaded_file = islandora_large_image_get_uploaded_file($object, $base_name);
-  if ($uploaded_file) {
-    $jp2 = islandora_large_image_create_JP2_derivative($object, $uploaded_file, $base_name);
-    $jpg = islandora_large_image_create_JPG_derivative($object, $uploaded_file, $base_name);
-    $tn = islandora_large_image_create_TN_derivative($object, $uploaded_file, $base_name);
-    return $jp2 && $jpg && $tn && file_unmanaged_delete($uploaded_file);
-  }
-  return FALSE;
-   */
-
-  /*
-
-function islandora_large_image_create_JPG_derivative(AbstractFedoraObject $object, $uploaded_file, $base_name) {
-  $args = array();
-  $args[] = '-resize ' . escapeshellarg("600 x 800");
-  $args[] = '-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75));
-  $derivative_file = islandora_large_image_imagemagick_convert($uploaded_file, "temporary://{$base_name}_JPG.jpg", $args);
-  if ($derivative_file === FALSE) {
-    drupal_set_message(t('Failed to create JPG derivative'), 'error');
-    return FALSE;
-  }
-  islandora_large_image_add_datastream($object, 'JPG', $derivative_file, 'image/jpeg', t('Medium sized JPEG'));
-  return file_unmanaged_delete($derivative_file);
-}
-  */
-
-  /*
-convert [TIFF_FILE_PATH] -resize 600x800 -quality 75 +delete -background White -gravity center label:"[COLLECTION_NAME]\nLafayette College Libraries\nhttp://digital.lafayette.edu/[DRUPAL_PATH_ALIAS]" \
-    -append [JPEG_FILE_PATH]
-   */
-
-  /*
-  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');
-  try {
-
-    $solr_query = "PID:\"$pid\"";
-    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf', 'sort' => 'dc.title asc'));
-  } catch (Exception $e) {
-
-    drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
-  }
-  $solr_results = json_decode($results->getRawResponse(), TRUE);
-
-  foreach($solr_results['response']['docs'] as $solr_doc) {
-
-  }
-  */
-
   if(!isset($connection)) {
 
     $url = 'http://localhost:8080/fedora';
@@ -993,15 +945,11 @@ convert [TIFF_FILE_PATH] -resize 600x800 -quality 75 +delete -background White -
 
     drush_log("Ingesting $metadb_file_path into the OBJ datastream for for {$object->id}...", 'ok');
 
-    // /mnt/imago1/master/MetaDB/imperial-postcards/lc-spcol-imperial-postcards-0001.tif
     islandora_large_image_add_datastream($object, 'OBJ', $metadb_file_path, 'image/tiff', t('Lossless TIFF'));
   }
 
   $tiff_file = file_save_data($object['OBJ']->content, "temporary://{$base_name}_OBJ.tiff");
 
-  /*
-convert warCasualties-10_OBJ_20.tiff[0] -resize '600x800' -quality '75' \( -background White -gravity center -bordercolor White -border 8 label:"Lafayette World War II Casualties\nLafayette College Libraries\nhttp://digital.lafayette.edu/collections/war/war-casualties-00004" \) -append warCasualties_10_JPG.jpg
-  */
   $args = array();
   $args[] = '-resize ' . escapeshellarg("600x800");
   $args[] = '-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75));
@@ -1462,12 +1410,15 @@ function islandora_dss_object_datastream_tokened_access_callback($perm, $object 
  */
 function islandora_dss_object_access_callback($perm, $object = NULL) {
 
-  if(in_array('islandora:pageCModel', $object->models)) {
+  if($object) {
 
-    return user_access('administer site configuration') && islandora_object_access_callback($perm, $object); 
+    if(in_array('islandora:pageCModel', $object->models)) {
+
+      return user_access('administer site configuration') && islandora_object_access_callback($perm, $object); 
+    }
+
+    return islandora_object_access_callback($perm, $object);
   }
-
-  return islandora_object_access_callback($perm, $object);
 }
 
 /**
