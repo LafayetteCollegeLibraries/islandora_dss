@@ -124,6 +124,13 @@ function islandora_dss_drush_command() {
 			      ),
 	  'aliases' => array('iupid'));
 
+  // This was implemented in response to DSS-360
+  $items['islandora-ingest-mods-m'] =
+    array('description' => dt('Ingest the content of the MODS-M into the MODS Datastream for a given Object'),
+	  'arguments' => array('arg1' => dt('the Fedora Commons Object PID')),
+	  'examples' => array('Standard example' => '',),
+	  'aliases' => array());
+
   /**
    * Collection path alias management
    *
@@ -212,6 +219,11 @@ function islandora_dss_drush_command() {
 	  'description' => dt(''),
 	  'aliases' => array('newspaper-ingest'));
 
+  $items['book-clean-thumbnails'] =
+    array(
+	  'description' => dt('Clean the thumbnail images for Islandora Objects by regenerating thumbnails for placeholders'),
+	  'aliases' => array('book-tn-clean'));
+
   /**
    * Islandora Large Image Object Tasks
    *
@@ -221,35 +233,55 @@ function islandora_dss_drush_command() {
 	  'description' => dt('Properly set the Datastream labels for MODS, OBJ, TN, and JPEG Large Image Object Datastreams'),
 	  'aliases' => array('lg-img-ds-labels'));
 
+  $items['large-image-clean-thumbnails'] =
+    array(
+	  'description' => dt('Clean the thumbnail images for Islandora Objects by regenerating thumbnails for placeholders'),
+	  'aliases' => array('lg-img-tn-clean'));
+
   /**
    * East Asia Image Collection tasks
    *
    */
-  $items['islandora-eaic-purge-warner-postcards'] =
+
+  // Tasks for purging the backs of postcards
+  $items['islandora-eaic-purge-backs-warner-postcards'] =
     array(
 	  'description' => dt('Purge the postcard backs for the Gerald & Rella Warner Taiwan Postcard Collection'),
-	  'aliases' => array('eaic-warner-backs'));
+	  'aliases' => array('purge-warner-backs'));
 
-  $items['islandora-eaic-purged-warner-negs-manchuria'] =
+  $items['islandora-eaic-purge-backs-warner-negs-manchuria'] =
     array(
 	  'description' => dt('Purge the postcard backs for the Gerald & Rella Warner Manchuria Negative Collection'),
-	  'aliases' => array('eaic-manchuria-backs'));
+	  'aliases' => array('purge-manchuria-backs'));
 
+  $items['islandora-eaic-purge-backs-lin-postcards'] =
+    array(
+	  'description' => dt('Purge the postcard backs for the Lin Chia Feng Collection'),
+	  'aliases' => array('purge-lin-backs'));
+
+  // Tasks for ingesting the backs of postcards
   $items['islandora-eaic-lewis-postcards-backs'] =
     array(
 	  'description' => dt('Ingest the postcard backs for the Michael Lewis Taiwan Postcard Collection'),
 	  'aliases' => array('eaic-lewis-backs'));
+
+  $items['islandora-eaic-lin-postcards-backs'] =
+    array(
+	  'description' => dt('Ingest the postcard backs for the Lin Chia Feng Collection'),
+	  'aliases' => array('eaic-lin-backs'));
 
   $items['islandora-eaic-rjw-stereo-backs'] =
     array(
 	  'description' => dt('Ingest the postcard backs for the T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur'),
 	  'aliases' => array('eaic-stereo-backs'));
 
+  // Content Metadata management tasks
   $items['islandora-eaic-contributor-donor'] =
     array(
 	  'description' => dt('Append metadata identifying the donor responsible for contributing certain sub-collections'),
 	  'aliases' => array('eaic-donor'));
 
+  // Object metadata management tasks
   $items['islandora-eaic-datastream-labels'] =
     array(
 	  'description' => dt('Properly set the Datastream labels for MODS, OBJ, TN, and JPEG Book (and related Page) Object Datastreams'),
@@ -353,37 +385,114 @@ function islandora_dss_drush_command() {
 			      ),
 	  'aliases' => array('iuer'));
 
+  /**
+   * Fedora Generic Search / Apache Solr tasks
+   *
+   */
+  $items['islandora-solr-update-collection'] =
+    array(
+	  'description' => dt('Update the Solr index for any given collection'),
+	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
+			       'arg2' => dt('Fedora Generic Search user password')),
+	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
+	  'aliases' => array(''));
+
   return $items;
 }
 
 /*
-function drush_islandora_dss_get_object() {
+ * Ingest MODS-M Datastream content into the MODS Datastream
+ * This resolves DSS-362
+ *
+ */
+function drush_islandora_dss_islandora_ingest_mods_m($object_pid) {
 
-  // Get the connection
-  $connection = islandora_get_tuque_connection(user_load(1), $url);
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $object = islandora_object_load($object_pid);
 
-  // Verify that the root Object has not already been ingested
-  try {
+  $mods_m_ds = $object['MODS-M'];
+  $mods_ds = $object['MODS'];
 
-    $root_collection = $connection->repository->getObject(urldecode($root_pid));
+  if($mods_m_ds) {
 
-    drush_log('Islandora root Object ' . $root_pid . ' already exists', 'error');
-  } catch (Exception $e) {
+    $mods_m_doc = new SimpleXMLElement($mods_m_ds->content);
+    $mods_m_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+    $elements = $mods_m_doc->xpath('//mods:titleInfo/mods:title');
+    if(empty($elements)) {
 
-    if ($e->getCode() == '404') {
+      throw new Exception("Could not locate the title for the Object within the MODS-M Datastream");
+    }
 
-      $root_collection = islandora_islandora_required_objects($connection);
-      islandora_add_object(array_shift($root_collection['islandora']['objects']));
-    
-      drush_log('The Islandora root Object ' . $root_pid . ' was successfully ingested', 'success');
-    } else {
+    $title_elem = array_shift($elements);
+    $title = (string) $title_elem;
 
-      drush_log($e->getMessage(), 'error');
-      return NULL;
+    preg_match('/\[(.+?)\]/', $title, $m);
+    $ds_label = $m[1] . '_MODS';
+
+    if($mods_ds) {
+
+      $object->purgeDatastream('MODS');
+    }
+
+    $mods_ds = $object->constructDatastream('MODS', 'X');
+    $mods_ds->label = $ds_label;
+    $mods_ds->mimeType = 'application/xml';
+    $mods_ds->content = $mods_m_ds->content;
+
+    try {
+
+      $object->ingestDatastream($mods_ds);
+      drush_log(dt('Successfully ingested the MODS-M Datastream content into the MODS Datastream for @object_id', array('@object_id' => $object->id)), 'success');
+    } catch (exception $e) {
+
+      drush_log(dt('@message', array('@message' => check_plain($e->getMessage()))), 'error');
     }
   }
 }
-*/
+
+/**
+ * For updating Solr Documents by collection
+ * @param string $cdm_collection
+ * @param string $fedoragsearch_pwd
+ * @param string $fedoragsearch_url
+ * @param string $fedoragsearch_user
+ */
+function drush_islandora_dss_islandora_solr_update_collection($cdm_collection, $fedoragsearch_pwd, $fedoragsearch_url = 'http://localhost:8080/fedoragsearch', $fedoragsearch_user = 'fgsAdmin') {
+
+  $result = FALSE;
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $solr_results = islandora_dss_basic_collection_get_objects_solr($cdm_collection);
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+    
+    drush_log("Updating the Document for " . $solr_doc['PID'] . "...", 'ok');
+
+    // Build the GET request
+    $params = array('operation' => 'updateIndex', 'action' => 'fromPid', 'value' => $solr_doc['PID']);
+    $url = $fedoragsearch_url . '/rest?' . http_build_query($params);
+
+    // Initialize the cURL handler
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+    curl_setopt($ch, CURLOPT_USERPWD, "$fedoragsearch_user:$fedoragsearch_pwd");
+
+    // Transmit the request
+    $response = curl_exec($ch);
+
+    // Handle all cURL errors
+    if(curl_errno($ch)) {
+
+      drush_log("Failed to update the Document for " . $solr_doc['PID'] . ":" . curl_error($ch), 'error');
+    } else {
+
+      drush_log("Updated the Document for " . $solr_doc['PID'], 'success');
+    }
+
+    curl_close($ch);
+  }
+}
 
 function drush_islandora_dss_generate_image_ds($object, $image_file_path, $args, $ds_name, $ds_label, $image_file_ext='tif') {
 
@@ -482,6 +591,157 @@ function drush_islandora_dss_generate_jpg_ds($object, $image_file_path, $image_f
   */
 
   return $object;
+}
+
+/**
+ * Retrieve Member Objects of a Collection Object using Apache Solr
+ * @param string $collection the name of the collection
+ * @returns array an array of Solr Documents serialized into the JSON
+ */
+function islandora_dss_basic_collection_get_objects_solr($collection) {
+
+  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  
+
+  try {
+
+    $solr_query = "cdm.Relation.IsPartOf:\"$collection\"";
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf', 'sort' => 'dc.title asc'));
+  } catch (Exception $e) {
+
+    drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
+  }
+
+  return json_decode($results->getRawResponse(), TRUE);
+}
+
+/**
+ * Thumbnail cleaning for Member Objects of an Islandora Object
+ * @param string $collection the collection to which the Book Objects belong
+ *
+ */
+function drush_islandora_dss_book_clean_thumbnails($collection, $thumbnail_placeholder_path = 'files/placeholder_tn.jpg') {
+
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  $result = FALSE;
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $solr_results = islandora_dss_basic_collection_get_objects_solr($collection);
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    $object = islandora_object_load($solr_doc['PID']);
+
+    if(!$object) {
+
+      drush_log('Solr Document for ' . $solr_doc['PID'] . 'must be updated', 'warning');
+      continue;
+    }
+      
+    if(isset($object['TN'])) {
+
+      $thumbnail_content = $object['TN']->content;
+      
+      $thumbnail_checksum = md5($thumbnail_content);
+      if(md5_file(drupal_get_path('module', 'islandora_dss') . '/' . $thumbnail_placeholder_path) == $thumbnail_checksum) {
+
+	// Regenerate the thumbnail for the Object
+	// @see islandora_large_image_create_all_derivatives()
+
+	drush_log('Cleaning the thumbnail for ' . $object->id, 'ok');
+
+	$pages = islandora_paged_content_get_pages($object);
+	$page = array_shift($pages);
+	$page = islandora_object_load($page['pid']);
+	$mime_detector = new MimeDetect();
+	$ext = $mime_detector->getExtension($page['TN']->mimeType);
+	$file = drupal_realpath('temporary://{$page->id}_TN.{$ext}');
+
+	$page['TN']->getContent($file);
+	$ret = islandora_paged_content_update_datastream($object,
+							 $file,
+							 'TN',
+							 'Thumbnail');
+	//file_unmanaged_delete($file);
+
+	/*
+	$base_name = str_replace(':', '-', $object->id);
+	$uploaded_file = islandora_large_image_get_uploaded_file($object, $base_name);
+	$tn = islandora_large_image_create_TN_derivative($object, $uploaded_file, $base_name) and file_unmanaged_delete($uploaded_file);
+	*/
+	$tn = islandora_paged_content_update_paged_content_thumbnail($object);
+
+	if(!$tn) {
+
+	  drush_log('Failed to clean the thumbnail for ' . $object->id, 'error');
+	} else {
+
+	  drush_log('Successfully cleaned the thumbnail for ' . $object->id, 'success');
+	}
+
+	$result = $result and $tn;
+      }
+    }
+  }
+
+  return $result;
+}
+
+
+
+/**
+ * Thumbnail cleaning for Member Objects of an Islandora Object
+ * @param string $collection the collection to which the Large Image Objects belong
+ *
+ */
+function drush_islandora_dss_large_image_clean_thumbnails($collection, $thumbnail_placeholder_path = 'files/placeholder_tn.jpg') {
+
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+
+  $result = FALSE;
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $solr_results = islandora_dss_basic_collection_get_objects_solr($collection);
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    $object = islandora_object_load($solr_doc['PID']);
+
+    if(!$object) {
+
+      drush_log('Solr Document for ' . $solr_doc['PID'] . 'must be updated', 'warning');
+      continue;
+    }
+      
+    if(isset($object['TN'])) {
+
+      $thumbnail_content = $object['TN']->content;
+      
+      $thumbnail_checksum = md5($thumbnail_content);
+      if(md5_file(drupal_get_path('module', 'islandora_dss') . '/' . $thumbnail_placeholder_path) == $thumbnail_checksum) {
+
+	// Regenerate the thumbnail for the Object
+	// @see islandora_large_image_create_all_derivatives()
+
+	drush_log('Cleaning the thumbnail for ' . $object->id, 'ok');
+
+	$base_name = str_replace(':', '-', $object->id);
+	$uploaded_file = islandora_large_image_get_uploaded_file($object, $base_name);
+	$tn = islandora_large_image_create_TN_derivative($object, $uploaded_file, $base_name) and file_unmanaged_delete($uploaded_file);
+
+	if(!$tn) {
+
+	  drush_log('Failed to clean the thumbnail for ' . $object->id, 'error');
+	} else {
+
+	  drush_log('Successfully cleaned the thumbnail for ' . $object->id, 'success');
+	}
+
+	$result = $result and $tn;
+      }
+    }
+  }
+
+  return $result;
 }
 
 /**
@@ -1365,7 +1625,7 @@ function drush_islandora_dss_islandora_eaic_purge_last_pages($collection = 'Gera
   } 
 }
 
-function drush_islandora_dss_islandora_eaic_purged_warner_negs_manchuria($collection = 'Gerald & Rella Warner Manchuria Negative Collection') {
+function drush_islandora_dss_islandora_eaic_purge_warner_negs_manchuria($collection = 'Gerald & Rella Warner Manchuria Negative Collection') {
 
   return drush_islandora_dss_islandora_eaic_purge_last_pages($collection);
 }
@@ -1375,8 +1635,14 @@ function drush_islandora_dss_islandora_eaic_purge_warner_postcards($collection =
   return drush_islandora_dss_islandora_eaic_purge_last_pages($collection);
 }
 
+function drush_islandora_dss_islandora_eaic_purge_lin_postcards($collection = 'Lin Chia-Feng Family Postcard Collection') {
+
+  return drush_islandora_dss_islandora_eaic_purge_last_pages($collection);
+}
+
 function drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, $coll_prefix) {
 
+  /*
   $MIGRATED = array(
 		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0057b.tif',
 		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0186b.tif',
@@ -1388,13 +1654,16 @@ function drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, $coll_prefix
 		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0344b.tif',
 		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0029b.tif',
 		    );
+  */
 
-  foreach(file_scan_directory($dir_path, '/\.tif/') as $file) {
+  foreach(file_scan_directory($dir_path, '/\.jpg/') as $file) {
 
+    /*
     if(in_array($file->uri, $MIGRATED)) {
 
       continue;
     }
+    */
 
     // Parse the 
     preg_match('/\-(\d{4})/', $file->uri, $m);
@@ -1420,15 +1689,24 @@ FILTER regex(?title, "' . $metadb_id . '") .
 
     drush_log("Ingesting {$file->uri} and appending it to $book_pid...", 'ok');
 
+    //exit(1);
     islandora_dss_book_page_ingest($file, $book_pid);
-
-    exit(1);
   }
 }
 
 function drush_islandora_dss_islandora_eaic_lewis_postcards_backs($dir_path = '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split') {
 
   return drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, 'lw');
+}
+
+/**
+ * Task for the ingestion of postcard backs for the Lin Chia Feng Collection
+ * @param string $dir_path the file system path to the directory containing the backs of the postcards
+ *
+ */
+function drush_islandora_dss_islandora_eaic_lin_postcards_backs($dir_path = '/mnt/smb/images/projects/master/other/lin-postcards/back-300dpi') {
+
+  return drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, 'cf');
 }
 
 function drush_islandora_dss_islandora_eaic_rjw_stereo_backs($dir_path = '/mnt/imago1/spcol/DSS-production/rjw-stereo-backs') {
