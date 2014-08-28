@@ -111,6 +111,11 @@ relation.IsPartOf
 
 class MdlPrintsModsDoc extends MetaDbModsDoc {
 
+  private static $delimited_fields = array('creator',
+					   'subject.lcsh',
+					   'publisher.original',
+					   'format.medium');
+
   public static $field_element_map = array('description' => array('name' => 'abstract',
 								  'attributes' => array()),
 
@@ -182,12 +187,9 @@ relation.IsPartOf
 
   function add_subject_lcsh($field_value) {
 
-    foreach(explode(',', $field_value) as $subject_value) {
-
-      $subject_elem = $this->doc->addChild('subject');
-      $subject_elem->addAttribute('authority', 'lcsh');
-      $subject_elem->addChild('topic', $subject_value);
-    }
+    $subject_elem = $this->doc->addChild('subject');
+    $subject_elem->addAttribute('authority', 'lcsh');
+    $subject_elem->addChild('topic', $field_value);
   }
 
   function add_format_medium($field_value) {
@@ -235,7 +237,6 @@ relation.IsPartOf
 <namePart>#{term}</namePart>
     */
 
-    //$name = $this->get_element('/mods:mods/mods:name', 'name');
     $name = $this->doc->addChild('name');
     $name->addAttribute('type', 'personal');
     $namePart = $name->addChild('namePart', $field_value);
@@ -253,9 +254,72 @@ relation.IsPartOf
   function add_date_original($field_value) {
 
     // @todo Implement normalization for date values
+    /*
+-----------------
+ Aug. 1806
+ 1824
+ 1892
+ 1831
+ 1894
+ 1854
+ 1790
+ 1794
+ [1825]
+ [1824]
+ 1850
+ 1918
+ 1823
+ Feb. 3, 1791
+ 1856
+ 1792
+ 1838
+ 1896
+ 1796
+ 1833
+ 1898
+ 1932
+ 1798
+ Aug. 26, 1785
+ 1895
+ 1934
+ 1830
+ 1876
+ 1843
+ 1839
+ 1829
+ c1830
+ July 1, 1794
+ January 1825
+ 1868
+ 1835
+ 1842
+ 1791
+ 1920
+ 1834
+ 
+ 1926
+ March 28, 1825
+ Nov. 23, 1830
+ 1863
+ August 10, 1830
+ 1859
+ June 1, 1791
+
+     */
+
+    // For years only
+    if(preg_match('/^\[?c?(\d{4})\]?$/', $field_value, $m)) {
+
+      $field_value = 'Jan. 1 ' . $m[1];
+    } elseif(preg_match('/^([a-zA-Z]+\.?)\s(\d{4})$/', $field_value, $m)) {
+
+      $field_value = $m[1] . ' 1 ' . $m[2];
+    }
+    $date = new DateTime($field_value);
+    $date_value = $date->format('Y-m-d') . 'T' . $date->format('H:i:s') . 'Z';
 
     $originInfo = $this->get_element('/mods:mods/mods:originInfo', 'originInfo');
-    $originInfo->addChild('dateCreated', $field_value);
+    $originInfo->addChild('dateCreated', $date_value);
   }
 
   function add_identifier_url_download($field_value) {
@@ -290,16 +354,44 @@ relation.IsPartOf
   function add_field($field_name, $field_value) {
 
     // @todo Resolve this properly for certain encoding issues
-    $field_value = htmlspecialchars($field_value);
+    //$field_value = htmlspecialchars($field_value);
 
     $method_name = 'add_' . preg_replace('/\./', '_', $field_name);
-    if(method_exists($this, $method_name)) {
 
-      return call_user_func(array($this, $method_name), $field_value);
-    } else {
+    if(in_array($field_name, self::$delimited_fields)) {
 
-      return $this->map_field($field_name, $field_value);
-    }    
+      // For cases in which fields contain semicolon-delimited values
+
+      print $field_value . "\n";
+      print_r(explode(';', $field_value));
+
+      //foreach(preg_split('/;/', $field_value) as $delimited_value) {
+      foreach(explode(';', $field_value) as $delimited_value) {
+
+	$delimited_value = htmlspecialchars($delimited_value);
+	
+	print "adding " . $delimited_value . "\n";
+	print $method_name;
+
+	if(method_exists($this, $method_name)) {
+
+	  call_user_func(array($this, $method_name), $delimited_value);
+	} else {
+
+	  $this->map_field($field_name, $delimited_value);
+	}
+      }
+    } else { // @todo Refactor
+
+      $field_value = htmlspecialchars($field_value);
+	if(method_exists($this, $method_name)) {
+
+	  return call_user_func(array($this, $method_name), $field_value);
+	} else {
+
+	  return $this->map_field($field_name, $field_value);
+	}
+    }
   }
 }
 
