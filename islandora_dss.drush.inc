@@ -132,6 +132,14 @@ function islandora_dss_drush_command() {
 	  'aliases' => array());
 
   /**
+   * MetaDB Tasks
+   *
+   */
+  $items['islandora-metadb-mods-ingest'] =
+    array('description' => dt('Ingest the MetaDB metadata as a MODS Document for an Islandora Object'),
+	  'aliases' => array());
+
+  /**
    * Collection path alias management
    *
    */
@@ -287,6 +295,8 @@ function islandora_dss_drush_command() {
 	  'description' => dt('Properly set the Datastream labels for MODS, OBJ, TN, and JPEG Book (and related Page) Object Datastreams'),
 	  'aliases' => array('eaic-ds-labels'));
 
+
+
   /**
    * Marquis de Lafayette Prints Collection tasks
    *
@@ -410,26 +420,39 @@ function islandora_dss_drush_command() {
   return $items;
 }
 
+//   $items['islandora-metadb-mods-ingest'] =
+
 function islandora_dss_metadb_extract($pg_host, $pg_user, $pg_password, $project_name, $item) {
 
-  $dbh = new PDO("pgsql:dbname=$dbname;host=$pg_host", $username, $password);
 
-  /*
-  $sql = 'SELECT name, color, calories FROM fruit ORDER BY name';
-  foreach ($conn->query($sql) as $row) {
-    print $row['name'] . "\t";
-    print $row['color'] . "\t";
-    print $row['calories'] . "\n";
-  }
-  */
-  
-  //def migrate(query="SELECT md_type,element,label,data FROM #{@admin_desc_table} AS admin_desc WHERE admin_desc.item_number=#{@item.id} AND admin_desc.project_name='#{@item.project}' UNION SELECT 'techical',tech_element,tech_label,tech_data FROM #{@tech_table} AS tech WHERE tech.item_number=#{@item.id} AND tech.project_name='#{@item.project}';")
-  $sql = "SELECT md_type,element,label,data FROM #{@admin_desc_table} AS admin_desc WHERE admin_desc.item_number=#{@item.id} AND admin_desc.project_name='#{@item.project}' UNION SELECT 'techical',tech_element,tech_label,tech_data FROM #{@tech_table} AS tech WHERE tech.item_number=#{@item.id} AND tech.project_name='#{@item.project}'";
 
 }
 
-// $items['islandora-mdl-prints-cdm-ingest'] =
-function drush_islandora_dss_islandora_mdl_prints_cdm_ingest($cdm_csv_file_path = 'MarquisDeLafayettePrints.csv', $field_value = 'Lafayette College Art Collection') {
+require 'libraries/MetaDbRecord.php';
+
+function drush_islandora_dss_islandora_metadb_mods_ingest($object_id, $project_name, $item_id) {
+
+  $mods_factory = new MetaDbModsFactory('127.0.0.1');
+  $mods_doc = $mods_factory->get_doc($project_name, $item_id);
+
+  $object = islandora_object_load($object_id);
+  if(!$object) {
+
+    drush_log(dt("Could not locate the Object @object_id", array('@object_id' => $object_id)), 'error');
+  } else {
+
+    $mods_ds = $object['MODS'];
+    if($mods_ds and $mods_ds->controlGroup != 'X') {
+
+      $object->purgeDatastream($mods_ds);
+      $mods_ds = $object->constructDatastream('MODS', 'X');
+    }
+
+    $mods_ds->content = (string) $mods_factory;
+  }
+}
+
+function islandora_dss_islandora_mdl_prints_cdm_ingest($cdm_csv_file_path = 'MarquisDeLafayettePrints.csv', $field_value = 'Lafayette College Art Collection') {
 
   $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');
 

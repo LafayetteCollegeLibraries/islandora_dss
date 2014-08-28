@@ -306,6 +306,16 @@ relation.IsPartOf
 
 class MetaDbModsFactory {
 
+  /**
+   * Static method for generating the Class name from the MetaDB Project name
+   * @param string $project_name
+   * @returns string
+   */
+  private static function get_mods_class($project_name) {
+
+    return implode(array_map('ucfirst', explode('-', $project_name))) . 'ModsDoc';
+  }
+
   /*
   public $pg_host;
   public $pg_database;
@@ -314,8 +324,12 @@ class MetaDbModsFactory {
   */
 
   // For the PDO Handler
+
   public $pg;
 
+  /**
+   * Constructor
+   */
   function __construct($pg_host = 'localhost',
 		       $pg_user = 'metadb',
 		       $pg_password = 'secret',
@@ -337,7 +351,13 @@ class MetaDbModsFactory {
 
   function get_doc($project_name,
 		   $item_id,
-		   $mods_class) {
+		   $mods_class = NULL) {
+
+    if(is_null($mods_class)) {
+
+      //$mods_class = 'MdlPrintsModsDoc';
+      $mods_class = self::get_mods_class($project_name);
+    }
 
     $mods_doc = new $mods_class();
 
