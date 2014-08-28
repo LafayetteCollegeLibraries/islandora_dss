@@ -206,6 +206,16 @@ function islandora_dss_drush_command() {
 	  'aliases' => array('iupid'));
 
   /**
+   * CONTENTdm Tasks
+   * @todo Migrate these into a CONTENTdm metadata migration Module (?)
+   */
+  module_load_include('drush.inc', 'islandora_dss', 'includes/contentdm');
+
+  $items['islandora-contentdm-mods-ingest'] =
+    array('description' => dt('Ingest CONTENTdm metadata as a MODS Document for an Islandora Object'),
+	  'aliases' => array());
+
+  /**
    * MetaDB Tasks
    * @todo Migrate these into the developing MetaDB Solution pack
    *
@@ -213,7 +223,7 @@ function islandora_dss_drush_command() {
   module_load_include('drush.inc', 'islandora_dss', 'includes/metadb');
 
   $items['islandora-metadb-mods-ingest'] =
-    array('description' => dt('Ingest the MetaDB metadata as a MODS Document for an Islandora Object'),
+    array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
 
   /**
@@ -339,9 +349,7 @@ function islandora_dss_drush_command() {
     array('description' => dt('Ingest a master TIFF file into an Islandora Large Image Object for the Marquis de Lafayette Prints Collection'),
 	  'aliases' => array());
 
-  $items['islandora-mdl-prints-cdm-ingest'] =
-    array('description' => dt('Ingest the CONTENTdm Metadata for Member Objects of the Marquis de Lafayette Prints Collection'),
-	  'aliases' => array());
+
 
 
 

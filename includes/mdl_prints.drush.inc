@@ -22,11 +22,10 @@ function drush_islandora_dss_islandora_mdl_prints_ingest($file_path) {
   } else {
 
     $item_id = $m[1];
-
-    //$object = drush_islandora_dss_islandora_large_image_ingest($file_path, 'mdlPrints', $pid = NULL, $label, $collections = array('islandora:mdlPrints'));
+    $object = drush_islandora_dss_islandora_large_image_ingest($file_path, 'mdlPrints', $pid = NULL, $label, $collections = array('islandora:mdlPrints'));
 
     // Migrate the metadata from MetaDB
-    return drush_islandora_dss_islandora_metadb_mods_ingest($object->id, 'mdl-prints', $item_id);
+    return drush_islandora_dss_islandora_metadb_mods_ingest('mdl-prints', $item_id, $object->id);
   }
 
   }

@@ -6,7 +6,7 @@
    *
    */
 
-abstract class MetaDbModsDoc {
+abstract class DssModsDoc {
 
   const MODS_XML = '
 <mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xlink="http://www.w3.org/1999/xlink">
@@ -109,7 +109,7 @@ relation.IsPartOf
 			    );
  */
 
-class MdlPrintsModsDoc extends MetaDbModsDoc {
+class MdlPrintsModsDoc extends DssModsDoc {
 
   private static $delimited_fields = array('creator',
 					   'subject.lcsh',
@@ -125,10 +125,25 @@ class MdlPrintsModsDoc extends MetaDbModsDoc {
 									     'attributes' => array('type' => 'ownership')),
 					   'description.series' => array('name' => 'note',
 									 'attributes' => array('type' => 'series')),
-					   'identifier.itemnumber' => array('name' => 'note',
+					   'identifier.itemnumber' => array('name' => 'identifier',
 									    'attributes' => array('type' => 'item-number',
 												  'displayLabel' => 'Identifier.ItemNumber')),
-					   'identifier.dmrecord' => array('name' => 'identifier',
+					   'identifier.oclc' => array('name' => 'identifier', // Unique to CONTENTdm
+								      'attributes' => array('type' => 'oclc',
+											    'displayLabel' => 'OCLC number')),
+					   'identifier.contentdm' => array('name' => 'identifier', // Unique to CONTENTdm
+									   'attributes' => array('type' => 'contentdm',
+												 'displayLabel' => 'CONTENTdm number',
+												 'invalid' => 'yes')), // http://cdm.lafayette.edu has reached the end of its service life
+					   'identifier.contentdm-file-name' => array('name' => 'identifier', // Unique to CONTENTdm
+										     'attributes' => array('type' => 'contentdm-file-name',
+													   'displayLabel' => 'CONTENTdm file name',
+													   'invalid' => 'yes')), // http://cdm.lafayette.edu has reached the end of its service life
+					   'identifier.contentdm-file-path' => array('name' => 'identifier', // Unique to CONTENTdm
+										     'attributes' => array('type' => 'contentdm-file-path',
+													   'displayLabel' => 'CONTENTdm file path',
+													   'invalid' => 'yes')), // http://cdm.lafayette.edu has reached the end of its service life
+					   'identifier.dmrecord' => array('name' => 'identifier', // Unique to MetaDB
 									  'attributes' => array('type' => 'content-dm',
 												'displayLabel' => 'CONTENTdm Digital Object Index')),
 					   'publisher.digital' => array('name' => 'note',
@@ -251,6 +266,19 @@ relation.IsPartOf
     $role->addAttribute('type', 'code');
   }
 
+  /**
+   * Method for adding the "Date modified" field
+   * Unique to CONTENTdm
+   *
+   */
+  function add_date_modified($field_value) {
+
+    $date = new DateTime($field_value);
+    $date_value = $date->format('Y-m-d') . 'T' . $date->format('H:i:s') . 'Z';
+    $originInfo = $this->get_element('/mods:mods/mods:originInfo', 'originInfo');
+    $originInfo->addChild('dateModified', $date_value);
+  }
+
   function add_date_original($field_value) {
 
     // @todo Implement normalization for date values
@@ -338,6 +366,19 @@ relation.IsPartOf
     $url->addAttribute('displayLabel', 'Zoom');
   }
 
+  /**
+   * Method for adding CONTENTdm Object URL's
+   * Unique to CONTENTdm
+   */
+  function add_identifier_url_contentdm($field_value) {
+
+    $location = $this->get_element('/mods:mods/mods:location', 'location');
+    $url = $location->addChild('url', $field_value);
+
+    $url->addAttribute('displayLabel', 'CONTENTdm Reference URL');
+    $url->addAttribute('note', 'This resource is no longer available.'); // http://cdm.lafayette.edu has reached the end of its service life
+  }
+
   function add_description_condition($field_value) {
 
     /*
@@ -362,17 +403,11 @@ relation.IsPartOf
 
       // For cases in which fields contain semicolon-delimited values
 
-      print $field_value . "\n";
-      print_r(explode(';', $field_value));
-
       //foreach(preg_split('/;/', $field_value) as $delimited_value) {
       foreach(explode(';', $field_value) as $delimited_value) {
 
 	$delimited_value = htmlspecialchars($delimited_value);
 	
-	print "adding " . $delimited_value . "\n";
-	print $method_name;
-
 	if(method_exists($this, $method_name)) {
 
 	  call_user_func(array($this, $method_name), $delimited_value);
@@ -393,85 +428,4 @@ relation.IsPartOf
 	}
     }
   }
-}
-
-
-class MetaDbModsFactory {
-
-  /**
-   * Static method for generating the Class name from the MetaDB Project name
-   * @param string $project_name
-   * @returns string
-   */
-  private static function get_mods_class($project_name) {
-
-    return implode(array_map('ucfirst', explode('-', $project_name))) . 'ModsDoc';
-  }
-
-  /*
-  public $pg_host;
-  public $pg_database;
-  public $pg_user;
-  public $pg_password;
-  */
-
-  // For the PDO Handler
-
-  public $pg;
-
-  /**
-   * Constructor
-   */
-  function __construct($pg_host = 'localhost',
-		       $pg_user = 'metadb',
-		       $pg_password = 'secret',
-		       $pg_port = 5432,
-		       $pg_dbname = 'metadb',
-		       $admin_desc_table = 'projects_adminmd_descmd',
-		       $tech_table = 'projects_techmd',
-		       $pg = NULL) {
-
-    $this->pg = $pg;
-    if(is_null($this->pg)) {
-
-      $this->pg = new PDO("pgsql:host=$pg_host;port=" . (string) $pg_port . ";dbname=$pg_dbname;", $pg_user, $pg_password);
-    }
-
-    $this->admin_desc_table = $admin_desc_table;
-    $this->tech_table = $tech_table;  
-  }
-
-  function get_doc($project_name,
-		   $item_id,
-		   $mods_class = NULL) {
-
-    if(is_null($mods_class)) {
-
-      //$mods_class = 'MdlPrintsModsDoc';
-      $mods_class = self::get_mods_class($project_name);
-    }
-
-    $mods_doc = new $mods_class();
-
-    $sql = "SELECT md_type,element,label,data FROM " . $this->admin_desc_table . " AS admin_desc WHERE admin_desc.item_number=$item_id AND admin_desc.project_name='$project_name' UNION SELECT 'techical',tech_element,tech_label,tech_data FROM " . $this->tech_table . " AS tech WHERE tech.item_number=$item_id AND tech.project_name='$project_name'";
-    foreach($this->pg->query($sql) as $row) {
-
-      /*
-     :element => row['element'],
-              :label => row['label'],
-              :data => row['data'], }
-      */
-      // Ignore format.technical
-      if($row['element'] == 'format.technical') {
-
-	continue;
-      }
-
-      $field_name = !empty($row['label']) ? $row['element'] . '.' . $row['label'] : $row['element'];
-      $mods_doc->add_field($field_name, $row['data']);
-    }
-
-    return $mods_doc;
-  }
-  
 }

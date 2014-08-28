@@ -6,7 +6,7 @@
    *
    */
 
-require dirname(__DIR__) . '/MetaDbRecord.php';
+require dirname(__DIR__) . '/MetaDb.php';
 
 /**
  * Tests for MetaDbModsFactory

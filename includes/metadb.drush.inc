@@ -10,7 +10,7 @@ $module_path = drupal_get_path('module', 'islandora_dss');
 @include_once "$module_path/vendor/autoload.php";
 @include_once "$module_path/libraries/MetaDbRecord.php";
 
-function drush_islandora_dss_islandora_metadb_mods_ingest($object_id, $project_name, $item_id) {
+function drush_islandora_dss_islandora_metadb_mods_ingest($project_name, $item_id, $object_id = NULL) {
 
   // Instantiate the connection as the admin user
   $connection = islandora_get_tuque_connection(user_load(1));
@@ -21,8 +21,26 @@ function drush_islandora_dss_islandora_metadb_mods_ingest($object_id, $project_n
   //print (string) $mods_doc;
   //exit(1);
 
+  if(is_null($object_id)) {
+
+    $path_item_id = $item_id;
+    if(preg_match('/\d{5}/', $path_item_id)) {
+
+      $path_item_id = substr($path_item_id, 1);
+    }
+
+    $object_path = drupal_get_normal_path('collections/lafayetteprints/' . $project_name . '-' . $path_item_id);
+    if(preg_match('/object\/(.+)/', $object_path, $m)) {
+
+      $object_id = $m[1];
+    }
+  }
+
   $object = islandora_object_load($object_id);
-  if(!$object) {
+  if(is_null($object_id)) {
+
+    drush_log(dt("Could not retrieve the Object PID for @item_id", array('@item_id' => $item_id)), 'error');
+  } elseif(!$object) {
 
     drush_log(dt("Could not locate the Object @object_id", array('@object_id' => $object_id)), 'error');
   } else {
@@ -37,6 +55,8 @@ function drush_islandora_dss_islandora_metadb_mods_ingest($object_id, $project_n
       $mods_ds = FALSE;
       //$mods_ds = $object->constructDatastream('MODS', 'X');
     }
+
+    $ds_label = preg_replace('/\-/', '_', $project_name) . preg_replace('/\-/', '_', $item_id) . '_MODS';
 
     if(!$mods_ds) {
 
