@@ -89,10 +89,9 @@ class ContentDmModsFactory {
   /**
    * Constructor
    */
-  function __construct($csv_file_path, $min = -1, $max = NULL) {
+  function __construct($csv_file_path, $options = array()) {
 
-    //$this->csv_file_path = $csv_file_path;
-    $this->cdm_metadata = new ContentDmMetadataSet($csv_file_path, $min, $max);
+    $this->cdm_metadata = new ContentDmMetadataSet($csv_file_path, $options);
   }
 
   function get_doc($item_id,

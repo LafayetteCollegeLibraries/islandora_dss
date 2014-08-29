@@ -8,7 +8,8 @@
 
 $module_path = drupal_get_path('module', 'islandora_dss');
 @include_once "$module_path/vendor/autoload.php";
-@include_once "$module_path/libraries/MetaDbRecord.php";
+@include_once "$module_path/libraries/MetaDb.php";
+@include_once "$module_path/libraries/Islandora.php";
 
 function drush_islandora_dss_islandora_metadb_mods_ingest($project_name, $item_id, $object_id = NULL) {
 
@@ -81,6 +82,39 @@ function drush_islandora_dss_islandora_metadb_mods_ingest($project_name, $item_i
     drush_log(dt("Successfully migrated the MetaDB metadata from @item_id into the MODS Document for @object_id", array('@item_id' => $item_id,
 															'@object_id' => $object_id)), 'success');
     return $mods_doc;
+  }
+}
+
+function drush_islandora_dss_islandora_metadb_collection_indexed($metadb_collection_name, $collection_pid) {
+
+  // Instantiate the connection as the admin user
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $session = new IslandoraSession($connection);
+  $collection = new IslandoraCollection($session, $collection_pid);
+
+  //$solr_results = islandora_dss_basic_collection_get_objects_solr($metadb_collection_name);
+  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  
+  $index = new IslandoraSolrIndex($solr);
+
+  foreach($collection->members as $member) {
+
+    $solr_query = "PID:\"" . $member->object->id . "\"";
+    $solr_results = $index->search($solr_query);
+    if(empty($solr_results['response']['docs'])) {
+
+      drush_log(dt('The Object ' . $member->object->id . 'was not successfully indexed'), 'warning');
+    }
+  }
+
+  $solr_query = "cdm.Relation.IsPartOf:\"$metadb_collection_name\"";
+  $solr_results = $index->search($solr_query);
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    if(!islandora_object_load($solr_doc['PID'])) {
+
+      drush_log(dt('The Object ' . $solr_doc['PID'] . 'was not successfully deleted from the index upon purging'), 'warning');
+    }
   }
 }
 

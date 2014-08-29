@@ -20,14 +20,15 @@ abstract class DssModsDoc {
   public $pg;
   public $doc;
 
-  //function __construct($item_id, $project_name, $pg) {
-  function __construct() {
+  function __construct($xmlstr = NULL) {
 
-    //$this->item_id;
-    //$this->project_name;
-    //$this->pg;
+    if(!is_null($xmlstr)) {
 
-    $this->doc = new SimpleXmlElement(self::MODS_XML);
+      $this->doc = new SimpleXmlElement($xmlstr);
+    } else {
+
+      $this->doc = new SimpleXmlElement(self::MODS_XML);
+    }
     $this->doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
   }
 

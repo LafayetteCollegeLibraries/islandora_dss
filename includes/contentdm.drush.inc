@@ -12,44 +12,6 @@ $module_path = drupal_get_path('module', 'islandora_dss');
 
 function drush_islandora_dss_islandora_contentdm_mods_ingest($csv_file_path, $cdm_id, $mods_class, $object_id = NULL) {
 
-  /*
-  if(($csv_file_path = fopen($csv_file_path, "r")) !== FALSE) {
-
-    $cdm_metadata = array();
-    $columns = array();
-
-    $row_index = -1;
-    while(($data = fgetcsv($csv_file_path, 0, "\t")) !== FALSE) {
-
-      $row_index++;
-      if(count($data) < 26) {
-
-	drush_log(dt('Bad data for row @row_index', array('@row_index' => $row_index)), 'warning');
-      } else {
-
-	$row = array();
-	for($column_index=0;$column_index < count($data);$column_index++) {
-
-	  // Ignore the header
-	  if($row_index == 0) {
-
-	    $columns[] = $data[$column_index];
-	    continue;
-	  } else {
-	      
-	    $row[$columns[$column_index]] = $data[$column_index];
-	  }
-	}
-
-	$cdm_metadata[] = $row;
-      }
-    }
-  } else {
-
-    drush_log(dt('Failed to open the file @csv_file_path', array('@csv_file_path' => $csv_file_path)), 'error');
-  }
-  */
-
   // Instantiate the connection as the admin user
   $connection = islandora_get_tuque_connection(user_load(1));
 
@@ -58,4 +20,59 @@ function drush_islandora_dss_islandora_contentdm_mods_ingest($csv_file_path, $cd
 
   print $mods_doc;
   
+  }
+
+/**
+ * Update a set of Islandora Objects using a set of CONTENTdm records
+ *
+ */
+function drush_islandora_dss_islandora_contentdm_update_subset($csv_file_path) {
+
+  // Instantiate the connection as the admin user
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $filter = function($row) {
+
+    return $row['Source'] == 'Lafayette College Art Collection';
+    //return $row['CONTENTdm file path'] == '/mdl-prints/image/1366.jp2';
+  };
+  //$mods_factory = new ContentDmModsFactory($csv_file_path, array('filter' => $filter));
+  $cdm_metadata = new ContentDmMetadataSet($csv_file_path, array('filter' => $filter));
+
+  //print count($mods_factory->cdm_metadata->fields);
+
+  for($i=0;$i<count($cdm_metadata->fields);$i++) {
+
+    preg_match('/(\d{5})/', $cdm_metadata->fields[$i]['Identifier.Download'], $m);
+    $metadb_id = substr($m[1], 1);
+    $path = drupal_get_normal_path('collections/lafayetteprints/mdl-prints-' . $metadb_id);
+
+    //print $path;
+
+    preg_match('/object\/(.+)/', $path, $m);
+    $object_id = $m[1];
+    $object = islandora_object_load($object_id);
+    if(!$object) {
+
+      drush_log(dt('Could not find the Object for ' . $metadb_id), 'error');
+    } else {
+
+    $mods_ds = $object['MODS'];
+    //$mods_doc = new SimpleXmlElement($mods_ds->content);
+
+    // Replace the "Source" field
+    //$mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+    //$mods_doc->xpath('/mods:mds');
+
+    $mods_doc = new MdlPrintsModsDoc($mods_ds->content);
+    if($mods_doc->doc->location->physicalLocation != $cdm_metadata->fields[$i]['Source']) {
+
+      unset($mods_doc->doc->location->physicalLocation);
+      $mods_doc->add_source($cdm_metadata->fields[$i]['Source']);
+      $mods_ds->setContentFromString( (string) $mods_doc);
+
+      drush_log(dt('Successfully updated the MODS metadata for ' . $object->id . "($metadb_id)"), 'success');
+    }
+    }
+  }
   }

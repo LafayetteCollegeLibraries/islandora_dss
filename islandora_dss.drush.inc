@@ -214,6 +214,9 @@ function islandora_dss_drush_command() {
   $items['islandora-contentdm-mods-ingest'] =
     array('description' => dt('Ingest CONTENTdm metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
+  $items['islandora-contentdm-update-subset'] =
+    array('description' => dt('Ingest CONTENTdm metadata as a MODS Document for an Islandora Object'),
+	  'aliases' => array());
 
   /**
    * MetaDB Tasks
@@ -223,6 +226,9 @@ function islandora_dss_drush_command() {
   module_load_include('drush.inc', 'islandora_dss', 'includes/metadb');
 
   $items['islandora-metadb-mods-ingest'] =
+    array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
+	  'aliases' => array());
+  $items['islandora-metadb-collection-indexed'] =
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
 
@@ -1079,7 +1085,7 @@ function drush_islandora_dss_islandora_ri_query_sparql($obj_pid, $sparql_query='
 
   print_r($results);
 
-  return $results;  
+  return $results;
 }
 
 function drush_islandora_dss_islandora_load_all_objects() {
