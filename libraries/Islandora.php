@@ -40,22 +40,15 @@ class IslandoraSolrIndex {
     $this->fedora_g_search_pass = $pass;
   }
 
+  private function request() {
+
+    // @todo Ensure that Solr receives a "commit" after updating the Fedora Generic Search index
+  }
+
   function search($solr_query, $params = array('fl' => 'PID', 'sort' => 'dc.title asc')) {
 
-    //$params = array_merge($params, array('fl' => 'PID'));
-
-    $objects = array();
     $solr_results = $this->solr->search($solr_query, 0, 1000000, $params);
 
-    /*
-    foreach($solr_results['response']['docs'] as $solr_doc) {
-
-      if(array_key_exists('PID', $solr_doc)) {
-
-	$objects[] = 
-      }
-    }
-    */
     return json_decode($solr_results->getRawResponse(), TRUE);
   }
 
@@ -88,6 +81,7 @@ class IslandoraSolrIndex {
     }
 
     curl_close($ch);
+    $this->solr->commit();
   }
 
   function delete($object_id) {
@@ -124,7 +118,8 @@ class IslandoraSolrIndex {
   }
 }
 
-abstract class IslandoraObject implements Serializable {
+
+class IslandoraObject implements Serializable {
 
   function __construct($session, $pid = NULL, $object = NULL) {
 
@@ -158,6 +153,68 @@ abstract class IslandoraObject implements Serializable {
   public function load() {
 
     $this->unserialize($this->object->id);
+  }
+
+  /**
+   * @todo Update for an XPath-based approach
+   *
+   */
+  public function update_xml_element($ds_id, $xpath, $value,
+				     $namespace_prefix = NULL,
+				     $namespace_uri = NULL) {
+
+    $this->load();
+
+    $ds = $this->object[$ds_id];
+    if($ds->controlGroup != 'X') {
+
+      throw new Exception("$ds_id is not managed as an inline XML Datastream");
+    }
+
+    $xml_str = preg_replace("/<$xpath>(.+?)<\/$xpath>/", "<$xpath>$value</$xpath>", $ds->content);
+    $ds->setContentFromString($xml_str);
+
+    /*
+    exit(1);
+
+    $ds_doc = new SimpleXmlElement($ds->content);
+
+    /*
+    foreach($ds_doc->xpath($xpath) as $key => &$node) {
+
+      print $node;
+      print $value;
+      $node = $value;
+    }
+    * /
+
+    exit(1);
+    $dom = new DOMDocument('1.0');
+    $dom->loadXML($ds->content);
+
+    $xp = new DOMXPath($dom);
+    if(!is_null($namespace_uri)) {
+
+      print $namespace_uri;
+      $xp->registerNamespace($namespace_prefix,$namespace_uri);
+    }
+    print $xpath;
+    print_r($xp->evaluate($xpath));
+
+    foreach($xp->query($xpath) as $node) {
+
+      print $node;
+    }
+
+    //print $ds_doc->asXml();
+    print $dom->saveXML();
+    exit(1);
+
+    $ds->setContentFromString($ds_doc->asXml());
+
+
+    */
+    $this->serialize();
   }
 }
 

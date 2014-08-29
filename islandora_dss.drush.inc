@@ -39,6 +39,8 @@ function islandora_dss_drush_command() {
    * Islandora Object operations
    *
    */
+  module_load_include('drush.inc', 'islandora_dss', 'includes/islandora');
+
   $items['islandora-purge-object'] =
     array(
 	  'description' => dt('Purge an Islandora Object'),
@@ -102,6 +104,12 @@ function islandora_dss_drush_command() {
 
   // This was implemented in response to DSS-360
   $items['islandora-ingest-mods-m'] =
+    array('description' => dt('Ingest the content of the MODS-M into the MODS Datastream for a given Object'),
+	  'arguments' => array('arg1' => dt('the Fedora Commons Object PID')),
+	  'examples' => array('Standard example' => '',),
+	  'aliases' => array());
+
+  $items['islandora-ds-xpath-update'] =
     array('description' => dt('Ingest the content of the MODS-M into the MODS Datastream for a given Object'),
 	  'arguments' => array('arg1' => dt('the Fedora Commons Object PID')),
 	  'examples' => array('Standard example' => '',),
