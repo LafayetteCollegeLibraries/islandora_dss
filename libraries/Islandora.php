@@ -28,9 +28,16 @@ class IslandoraSession {
 
 class IslandoraSolrIndex {
 
-  function __construct($solr, $fedora_g_search = 'http://localhost:8080/fedoragsearch') {
+  function __construct($solr,
+		       $user = 'fgsAdmin',
+		       $pass = 'secret',
+		       $fedora_g_search = 'http://localhost:8080/fedoragsearch') {
 
     $this->solr = $solr;
+    $this->fedora_g_search = $fedora_g_search;
+
+    $this->fedora_g_search_user = $user;
+    $this->fedora_g_search_pass = $pass;
   }
 
   function search($solr_query, $params = array('fl' => 'PID', 'sort' => 'dc.title asc')) {
@@ -50,6 +57,70 @@ class IslandoraSolrIndex {
     }
     */
     return json_decode($solr_results->getRawResponse(), TRUE);
+  }
+
+  function update($object_id) {
+
+    /**
+     * @todo Refactor using Guzzle
+     *
+     */
+    // Build the GET request
+    $params = array('operation' => 'updateIndex', 'action' => 'fromPid', 'value' => $object_id);
+    $url = $this->fedora_g_search . '/rest?' . http_build_query($params);
+
+    $userpwd = $this->fedora_g_search_user . ':' . $this->fedora_g_search_pass;
+
+    // Initialize the cURL handler
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+    curl_setopt($ch, CURLOPT_USERPWD, $userpwd);
+
+    // Transmit the request
+    $response = curl_exec($ch);
+
+    // Handle all cURL errors
+    if(curl_errno($ch)) {
+
+      throw new Exception("Failed to update the Document for " . $object_id . ":" . curl_error($ch));
+    }
+
+    curl_close($ch);
+  }
+
+  function delete($object_id) {
+
+    // http://crete0.stage.lafayette.edu:8080/fedoragsearch/rest?operation=updateIndex&action=deletePid&value=test
+
+    /**
+     * @todo Refactor using Guzzle
+     *
+     */
+    // Build the GET request
+    $params = array('operation' => 'updateIndex', 'action' => 'deletePid', 'value' => $object_id);
+    $url = $this->fedora_g_search . '/rest?' . http_build_query($params);
+
+    $userpwd = $this->fedora_g_search_user . ':' . $this->fedora_g_search_pass;
+
+    // Initialize the cURL handler
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+    curl_setopt($ch, CURLOPT_USERPWD, $userpwd);
+
+    // Transmit the request
+    $response = curl_exec($ch);
+
+    // Handle all cURL errors
+    if(curl_errno($ch)) {
+
+      throw new Exception("Failed to update the Document for " . $object_id . ":" . curl_error($ch));
+    }
+
+    curl_close($ch);
   }
 }
 

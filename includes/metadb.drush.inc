@@ -85,7 +85,11 @@ function drush_islandora_dss_islandora_metadb_mods_ingest($project_name, $item_i
   }
 }
 
-function drush_islandora_dss_islandora_metadb_collection_indexed($metadb_collection_name, $collection_pid) {
+/**
+ * Reporting task used to generate a list of all Objects which have been ingested by Fedora Commons and indexed by Apache Solr
+ *
+ */
+function drush_islandora_dss_islandora_metadb_report_indexed($metadb_collection_name, $collection_pid) {
 
   // Instantiate the connection as the admin user
   $connection = islandora_get_tuque_connection(user_load(1));
@@ -114,6 +118,53 @@ function drush_islandora_dss_islandora_metadb_collection_indexed($metadb_collect
     if(!islandora_object_load($solr_doc['PID'])) {
 
       drush_log(dt('The Object ' . $solr_doc['PID'] . 'was not successfully deleted from the index upon purging'), 'warning');
+    }
+  }
+}
+
+/**
+ * Reporting task listing Objects potentially duplicating materials within Collections
+ *
+ */
+function drush_islandora_dss_islandora_metadb_report_duplicates($metadb_collection_name) {
+
+  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  
+  $index = new IslandoraSolrIndex($solr);
+  $solr_query = "cdm.Relation.IsPartOf:\"$metadb_collection_name\"";
+  $solr_results = $index->search($solr_query, array('fl' => 'PID dc.identifier'));
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    /*
+    if(!islandora_object_load($solr_doc['PID'])) {
+
+      drush_log(dt('The Object ' . $solr_doc['PID'] . 'was not successfully deleted from the index upon purging'), 'warning');
+    }
+    */
+
+    // @todo Refactor with faceting
+    //$solr_query = "dc.identifier:\"" . $solr_doc['dc.identifier'][1] . "\"";
+    // dc.identifier:(*00185)
+
+    /*
+    for($i=0;!preg_match('/(\d{4,5})/', $solr_doc['dc.identifier'][$i], $m);$i++) {
+
+      print $solr_doc['dc.identifier'][$i];
+      $metadb_id = $m[1];
+    }
+    */
+    preg_match('/(\d{4,5})/', $solr_doc['dc.identifier'][1], $m);
+    $metadb_id = $m[1];
+    //drush_log(dt('Searching for duplicates for the MetaDB Item ' . $metadb_id), 'ok');
+    print '.';
+
+    $solr_query = "dc.identifier:(*" . $metadb_id . ")";
+    $solr_results = $index->search($solr_query, array('fl' => 'PID dc.identifier'));
+
+    if(count($solr_results['response']['docs']) > 1) {
+
+      //drush_log(dt('The Object ' . $solr_doc['PID'] . 'was not successfully deleted from the index upon purging'), 'warning');
+      drush_log(dt('MetaDB Item ' . $solr_doc['dc.identifier'][1] . ' may have been duplicated.'), 'warning');
     }
   }
 }

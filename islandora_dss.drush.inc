@@ -228,7 +228,10 @@ function islandora_dss_drush_command() {
   $items['islandora-metadb-mods-ingest'] =
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
-  $items['islandora-metadb-collection-indexed'] =
+  $items['islandora-metadb-report-indexed'] =
+    array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
+	  'aliases' => array());
+  $items['islandora-metadb-report-duplicates'] =
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
 
@@ -461,9 +464,25 @@ function islandora_dss_drush_command() {
    * Fedora Generic Search / Apache Solr tasks
    *
    */
+  module_load_include('drush.inc', 'islandora_dss', 'includes/islandora_solr');
+
   $items['islandora-solr-update-collection'] =
     array(
 	  'description' => dt('Update the Solr index for any given collection'),
+	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
+			       'arg2' => dt('Fedora Generic Search user password')),
+	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
+	  'aliases' => array(''));
+
+  $items['islandora-solr-update-object'] =
+    array('description' => dt('Update the Solr index for any given collection'),
+	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
+			       'arg2' => dt('Fedora Generic Search user password')),
+	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
+	  'aliases' => array(''));
+
+  $items['islandora-solr-delete-object'] =
+    array('description' => dt('Update the Solr index for any given collection'),
 	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
 			       'arg2' => dt('Fedora Generic Search user password')),
 	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
@@ -524,49 +543,7 @@ function drush_islandora_dss_islandora_ingest_mods_m($object_pid) {
   }
 }
 
-/**
- * For updating Solr Documents by collection
- * @param string $cdm_collection
- * @param string $fedoragsearch_pwd
- * @param string $fedoragsearch_url
- * @param string $fedoragsearch_user
- */
-function drush_islandora_dss_islandora_solr_update_collection($cdm_collection, $fedoragsearch_pwd, $fedoragsearch_url = 'http://localhost:8080/fedoragsearch', $fedoragsearch_user = 'fgsAdmin') {
 
-  $result = FALSE;
-  $tuque = islandora_get_tuque_connection(user_load(1));
-  $solr_results = islandora_dss_basic_collection_get_objects_solr($cdm_collection);
-
-  foreach($solr_results['response']['docs'] as $solr_doc) {
-    
-    drush_log("Updating the Document for " . $solr_doc['PID'] . "...", 'ok');
-
-    // Build the GET request
-    $params = array('operation' => 'updateIndex', 'action' => 'fromPid', 'value' => $solr_doc['PID']);
-    $url = $fedoragsearch_url . '/rest?' . http_build_query($params);
-
-    // Initialize the cURL handler
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
-    curl_setopt($ch, CURLOPT_USERPWD, "$fedoragsearch_user:$fedoragsearch_pwd");
-
-    // Transmit the request
-    $response = curl_exec($ch);
-
-    // Handle all cURL errors
-    if(curl_errno($ch)) {
-
-      drush_log("Failed to update the Document for " . $solr_doc['PID'] . ":" . curl_error($ch), 'error');
-    } else {
-
-      drush_log("Updated the Document for " . $solr_doc['PID'], 'success');
-    }
-
-    curl_close($ch);
-  }
-}
 
 function drush_islandora_dss_generate_image_ds($object, $image_file_path, $args, $ds_name, $ds_label, $image_file_ext='tif') {
 
