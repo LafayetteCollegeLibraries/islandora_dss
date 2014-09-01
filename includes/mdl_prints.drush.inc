@@ -30,6 +30,38 @@ function drush_islandora_dss_islandora_mdl_prints_ingest($file_path) {
 
   }
 
+function drush_islandora_dss_islandora_mdl_prints_append_source($collection_name = 'Marquis de Lafayette Prints Collection') {
+
+  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  
+  $index = new IslandoraSolrIndex($solr);
+
+  $solr_query = "cdm.Relation.IsPartOf:\"" . $collection_name . "\"";
+  //$solr_query = "PID:\"" . '' . "\"";
+  $solr_results = $index->search($solr_query);
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    $object = islandora_object_load($solr_doc['PID']);
+    $mods_ds = $object['MODS'];
+
+    $mods_doc = new SimpleXmlElement($mods_ds->content);
+    $mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+
+    $results = $mods_doc->xpath('//mods:location/mods:physicalLocation[@displayLabel="Source"]');
+    if(!count($results)) {
+
+      unset($mods_doc->physicalLocation);
+      unset($mods_doc->location->physicallocation);
+
+      $stmtResp = array_shift($mods_doc->xpath('//mods:note[@type="statement of responsibility"]'));
+      $physicalLoc = $mods_doc->location->addChild('physicalLocation', htmlspecialchars((string) $stmtResp));
+      $physicalLoc->addAttribute('displayLabel', 'Source');
+
+      $mods_ds->setContentFromString($mods_doc->asXml());
+      drush_log(dt('Updated the "Source" field successfully for ' . $object->id), 'success');
+    }
+  }
+}
+
 /**
  * Deprecated; Use MetaDB
  */

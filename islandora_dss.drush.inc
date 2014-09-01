@@ -365,6 +365,9 @@ function islandora_dss_drush_command() {
   $items['islandora-mdl-prints-ingest'] =
     array('description' => dt('Ingest a master TIFF file into an Islandora Large Image Object for the Marquis de Lafayette Prints Collection'),
 	  'aliases' => array());
+  $items['islandora-mdl-prints-append-source'] =
+    array('description' => dt('Append "Source" field values for the Marquis de Lafayette Prints Collection'),
+	  'aliases' => array());
 
 
 
