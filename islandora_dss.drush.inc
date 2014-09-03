@@ -18,24 +18,6 @@ function islandora_dss_drush_command() {
   //function drush_islandora_dss_islandora_ingest_page($book_pid, $file_path, $url='http://localhost:8080/fedora', $page_pid=NULL) {  
 
   /**
-   * Islandora Page Object operations
-   *
-   */
-  $items['islandora-ingest-page'] =
-    array(
-	  'description' => dt('Ingest an Islandora Page'),
-	  'arguments' => array('arg1' => dt('the Book Object PID'),
-			       'arg2' => dt('the TIFF image file path'),
-			       'arg3' => dt('the URL for the Fedora Commons installation'),
-			       'arg4' => dt('the Page Object PID')
-			       ),
-	  'examples' => array(
-			      'Standard example' => 'drush islandora-ingest-page islandora:bookN /var/opt/images/file.tiff',
-			      'Argument example' => 'drush islandora-ingest-page islandora:bookN /var/opt/images/file.tiff http://localhost:8080/fedora islandora:pageN',
-			      ),
-	  'aliases' => array('iip'));
-
-  /**
    * Islandora Object operations
    *
    */
@@ -144,6 +126,8 @@ function islandora_dss_drush_command() {
    * Islandora Book Object Tasks
    *
    */
+  module_load_include('drush.inc', 'islandora_dss', 'includes/islandora_book');
+
   $items['islandora-book-derive-tn'] =
     array(
 	  'description' => dt('Derive thumbnails for any given Islandora Book Object'),
@@ -163,6 +147,29 @@ function islandora_dss_drush_command() {
     array(
 	  'description' => dt('Clean the thumbnail images for Islandora Objects by regenerating thumbnails for placeholders'),
 	  'aliases' => array('book-tn-clean'));
+
+  $items['islandora-book-compare-derivatives'] =
+    array(
+	  'description' => dt(''), // @todo Implement
+	  'aliases' => array());
+
+  /**
+   * Islandora Page Object operations
+   *
+   */
+  $items['islandora-ingest-page'] =
+    array(
+	  'description' => dt('Ingest an Islandora Page'),
+	  'arguments' => array('arg1' => dt('the Book Object PID'),
+			       'arg2' => dt('the TIFF image file path'),
+			       'arg3' => dt('the URL for the Fedora Commons installation'),
+			       'arg4' => dt('the Page Object PID')
+			       ),
+	  'examples' => array(
+			      'Standard example' => 'drush islandora-ingest-page islandora:bookN /var/opt/images/file.tiff',
+			      'Argument example' => 'drush islandora-ingest-page islandora:bookN /var/opt/images/file.tiff http://localhost:8080/fedora islandora:pageN',
+			      ),
+	  'aliases' => array('iip'));
 
   /**
    * Islandora Large Image Object Tasks
@@ -308,6 +315,7 @@ function islandora_dss_drush_command() {
    * East Asia Image Collection tasks
    *
    */
+  module_load_include('drush.inc', 'islandora_dss', 'includes/east_asia');
 
   // Tasks for purging the backs of postcards
   $items['islandora-eaic-purge-backs-warner-postcards'] =
@@ -350,6 +358,15 @@ function islandora_dss_drush_command() {
     array(
 	  'description' => dt('Properly set the Datastream labels for MODS, OBJ, TN, and JPEG Book (and related Page) Object Datastreams'),
 	  'aliases' => array('eaic-ds-labels'));
+
+  $items['islandora-east-asia-mods-export'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array(''));
+  $items['islandora-east-asia-mods-export-collection'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array(''));
 
   /**
    * Marquis de Lafayette Prints Collection tasks
@@ -1374,51 +1391,7 @@ function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/D
  *
  */
 
-function drush_islandora_dss_islandora_book_derive_tn($book_pid) {
 
-  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
-  $tuque = islandora_get_tuque_connection(user_load(1));
-
-  $book = islandora_object_load($book_pid);
-
-  islandora_paged_content_page_derive_image_datastreams($book);
-}
-
-function drush_islandora_dss_islandora_book_ingest_tn($book_pid, $derivative_file) {
-
-  //module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
-  $tuque = islandora_get_tuque_connection(user_load(1));
-
-  //drupal_load('module', 'islandora_large_object');
-  module_load_include('inc', 'islandora_large_object', 'includes/derivatives');
-  module_load_include('inc', 'islandora_solution_large_object', 'includes/derivatives');
-
-  //$book = islandora_object_load($book_pid);
-  $book = $tuque->repository->getObject($book_pid);
-
-  //islandora_paged_content_page_derive_image_datastreams($book);
-  //islandora_large_image_add_datastream($book, 'TN', $derivative_file, 'image/jpeg', t('Thumbnail'));
-
-  $object = $book;
-  //$file = fopen($derivative_file, "r");
-  $file = $derivative_file;
-
-  $ds = $object->constructDatastream($dsid, 'M');
-  $ds->label = $label;
-  $ds->mimeType = $mimetype;
-  $ds->setContentFromFile($file);
-  try {
-    $object->ingestDatastream($ds);
-  } catch (exception $e) {
-    drupal_set_message(t('@message', array('@message' => check_plain($e->getMessage()))), 'error');
-
-    //fclose($file);
-    return FALSE;
-  }
-
-  //fclose($file);
-  return TRUE;
-}
 
 /**
  * East Asia Image Collection tasks

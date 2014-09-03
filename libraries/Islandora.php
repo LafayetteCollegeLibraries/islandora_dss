@@ -121,6 +121,8 @@ class IslandoraSolrIndex {
 
 class IslandoraObject implements Serializable {
 
+  public $id;
+
   function __construct($session, $pid = NULL, $object = NULL) {
 
     $this->session = $session;
@@ -133,6 +135,8 @@ class IslandoraObject implements Serializable {
       
       $this->object = (object) array('id' => $pid);
     }
+
+    $this->id = $this->object->id;
   }
 
   public function serialize() {
@@ -153,6 +157,16 @@ class IslandoraObject implements Serializable {
   public function load() {
 
     $this->unserialize($this->object->id);
+  }
+
+  public function datastream($ds_id) {
+
+    if(get_class($this->object) == 'stdClass') {
+
+      $this->unserialize($this->object->id);
+    }
+
+    return $this->object[$ds_id];
   }
 
   /**
@@ -215,6 +229,110 @@ class IslandoraObject implements Serializable {
 
     */
     $this->serialize();
+  }
+}
+
+
+/**
+ * Class for Islandora Datastreams
+ *
+ */
+
+class IslandoraDatastream implements Serializable {
+
+  public $object;
+  public $ds;
+  public $file;
+  public $uri;
+
+  public $file_path;
+
+  function __construct($object, $id, $dir_path = '/tmp', $ds = NULL) {
+
+    $this->object = $object;
+    $this->id = $id;
+
+    //$this->dir_path = $dir_path;
+
+    $this->ds = $ds;
+    if(is_null($this->ds)) {
+
+      $this->ds = $this->object->datastream($id);
+    }
+
+    $this->file_path = $dir_path . '/islandora_dss_' . preg_replace('/\:/', '_', $this->object->id) . '.' . ($this->ds->id == 'OBJ' ? 'tiff' : strtolower($this->ds->id));
+    $this->uri = $this->object->id . '/' . $this->ds->location;
+  }
+
+  private function get_content() {
+
+    $this->ds->getContent($this->file_path);
+    $this->file = fopen($this->file_path, 'rb');
+  }
+
+  /**
+   * Close the file handler and return the URL for the Datastream
+   *
+   */
+  public function serialize() {
+
+    fclose($this->file);
+    unlink($this->file_path);
+
+    return $this->uri;
+  }
+
+  /**
+   * Open the file hander for reading from the resource
+   *
+   */
+  public function unserialize($uri) {
+
+    //@todo Refactor
+    $this->get_content();
+  }
+
+  public function load() {
+
+    $this->unserialize($this->uri);
+  }
+}
+
+
+class IslandoraImageDatastream extends IslandoraDatastream {
+
+  // Wrapper for the ImageMagick "compare" operation
+
+  /**
+   * Comparison operation
+   * @param IslandoraImageDatastream $u
+   * @param IslandoraImageDatastream $v
+   *
+   */
+  static public function compare(IslandoraImageDatastream $u, IslandoraImageDatastream $v,
+				 $compare_bin_path = '/usr/bin/env compare',
+				 $params = array()) {
+
+    $u->load();
+    $v->load();
+    // Construct the parameters
+    $params = array_merge(array('-verbose',
+				'-metric mae'),
+			  $params,
+			  array($u->file_path,
+				$v->file_path));
+
+    $invocation = implode(' ', array_merge(array($compare_bin_path), $params));
+    $output = array();
+    $result = 1;
+
+    print escapeshellcmd($invocation);
+    exit(1);
+    exec(escapeshellcmd($invocation), $output, $result);
+    $u->serialize();
+    $v->serialize();
+
+    return $output;
   }
 }
 
@@ -300,7 +418,88 @@ class IslandoraCollection extends IslandoraObject {
   }
   }
 
-class IslandoraLargeImage extends IslandoraObject {
+abstract class IslandoraImageObject extends IslandoraObject {
 
-  
+  static public $derivative_ds_ids = array('JP2', 'JPG', 'TN');
+  public $master;
+  public $derivatives;
+
+  function __construct($session, $pid = NULL, $object = NULL) {
+
+    parent::__construct($session, $pid, $object);
+
+    $this->master = new IslandoraImageDatastream($this, 'OBJ');
+    $this->set_derivatives();
+  }
+
+  private function set_derivatives() {
+
+    foreach(self::$derivative_ds_ids as $ds_id) {
+
+      $this->derivatives[$ds_id] = new IslandoraImageDatastream($this, $ds_id);
+    }
+  }
+}
+
+class IslandoraLargeImage extends IslandoraImageObject {
+
+}
+
+/**
+ * Class for Islandora Page Objects
+ *
+ */
+class IslandoraPage extends IslandoraImageObject {
+
+  public $book;
+  public $number;
+  public $width;
+  public $height;
+
+  function __construct($session, $book, $number,
+		       $pid = NULL, $width = NULL, $height = NULL, $object = NULL) {
+    
+    parent::__construct($session, $pid, $object);
+    $this->book = $book;
+    $this->number = $number;
+    $this->width = $width;
+    $this->height = $height;
+  }
+}
+
+/**
+ * Class for Islandora Book Objects
+ *
+ */
+class IslandoraBook extends IslandoraObject {
+
+  function __construct($session, $pid = NULL, $object = NULL) {
+    
+    parent::__construct($session, $pid, $object);
+    $this->set_pages();
+  }
+
+  private function set_pages() {
+
+    $query = 'PREFIX islandora-rels-ext: <http://islandora.ca/ontology/relsext#>
+SELECT ?pid ?page ?label ?width ?height
+FROM <#ri>
+WHERE {
+  ?pid <fedora-rels-ext:isMemberOf> <info:fedora/' . $this->object->id . '> ;
+       <fedora-model:label> ?label ;
+       islandora-rels-ext:isSequenceNumber ?page .
+  OPTIONAL {
+    ?pid <fedora-view:disseminates> ?dss .
+    ?dss <fedora-view:disseminationType> <info:fedora/*/JP2> ;
+         islandora-rels-ext:width ?width ;
+         islandora-rels-ext:height ?height .
+ }
+}
+ORDER BY ?page';
+
+    foreach($this->session->connection->repository->ri->sparqlQuery($query) as $result) {
+
+      $this->pages[] = new IslandoraPage($this->session, $this, $result['page']['value'], $result['pid']['value'], $result['width']['value'], $result['height']['value']);
+    }
+  }
 }

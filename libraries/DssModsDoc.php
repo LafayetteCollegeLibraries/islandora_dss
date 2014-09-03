@@ -6,6 +6,174 @@
    *
    */
 
+
+class DssMetaDbProject {
+
+  public $name;
+  
+  function __construct($name) {
+
+    $this->name = $name;
+  }
+
+  }
+
+class DssMetaDbItem {
+
+  public $number;
+  
+  function __construct($number) {
+
+    $this->number = $number;
+  }
+
+  }
+
+class DssMetaDbRecordSet {
+
+  public $project;
+  public $records;
+
+  function __construct($project) {
+
+    $this->project = $project;
+    $this->records = array();
+  }
+
+  function get_columns() {
+
+    $columns = array_map(function($column) {
+
+	return DssMetaDbRecord::csv_format($column);
+      }, array_keys($this->records[0]->fields));
+
+    return $columns;
+  }
+
+  function toArray() {
+
+    // Retrieve the column headings
+    $columns = implode(',', $this->get_columns());
+    return array_merge(array($columns), array_map(function($record) {
+	  
+	  return (string) $record;
+	}, $this->records));
+  }
+
+  function __toString() {
+
+    return implode("\n", $this->toArray());
+  }
+
+  function to_csv($file_path = NULL) {
+    
+    // @todo Refactor
+    if(is_null($file_path)) {
+
+      $file_path = '/tmp' . '/' . preg_replace('/\-/', '_', $this->project) . '/' . preg_replace('/\-/', '_', $this->item);
+    }
+
+    $fh = fopen($file_path, 'w');
+
+    fputcsv($fh, $this->get_columns());
+    foreach($this->records as $record) {
+
+      fputcsv($fh, $record->toArray());
+    }
+    fclose($fh);
+    return $file_path;
+  }
+}
+
+/**
+ * Class for MetaDB metadata records
+ *
+ */
+class DssMetaDbRecord {
+  
+  public $project;
+  public $item;
+  public $fields;
+
+  static public function csv_format($data) {
+
+    if(preg_match('/[,"]/', $data)) {
+
+      $data = "\"$data\"";
+    }
+
+    return $data;
+  }
+
+  function __construct($project, $item) {
+
+    $this->project = $project;
+    $this->item = $item;
+    $this->fields = array();
+  }
+
+  function toArray() {
+
+    $values = array();
+    foreach($this->fields as $column => $field) {
+
+      $values[] = (string) $field;
+    }
+
+    return $values;
+  }
+
+  function to_csv($delimiter = ',') {
+
+    return implode($delimiter, $this->toArray());
+  }
+
+  function __toString() {
+
+    return $this->to_csv();
+  }
+
+  }
+
+/**
+ * Base class for MetaDB metadata fields
+ *
+ */
+
+abstract class DssMetaDbField {
+
+  public $element;
+  public $label;
+  public $data;
+
+  function __construct($element, $label, $data) {
+
+    $this->element = $element;
+    $this->label = $label;
+    $this->data = $data;
+  }
+
+  function __toString() {
+
+    return DssMetaDbRecord::csv_format($this->data);
+  }
+}
+
+class DssMetaDbAdminDescField extends DssMetaDbField {
+
+  }
+
+
+class DssMetaDbTechField extends DssMetaDbField {
+
+  }
+
+
+
+/**
+ * Base class for all MODS Documents generated from metadata aggregated by MetaDB
+ *
+ */
 abstract class DssModsDoc {
 
   const MODS_XML = '
@@ -19,8 +187,12 @@ abstract class DssModsDoc {
 
   public $pg;
   public $doc;
+  public $records;
+  public $record;
 
-  function __construct($xmlstr = NULL) {
+  function __construct($xmlstr = NULL,
+		       $project = NULL, $item = NULL,
+		       $record = NULL) {
 
     if(!is_null($xmlstr)) {
 
@@ -29,7 +201,19 @@ abstract class DssModsDoc {
 
       $this->doc = new SimpleXmlElement(self::MODS_XML);
     }
+
     $this->doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+
+    //$this->records = $records;
+    $this->record = $record;
+
+    if(!is_null($item)) {
+
+      //$this->records = new DssMetaDbRecordSet($project);
+      
+      //$this->record = new DssMetaDbRecord($project, $item);
+      //$this->records->records[] = $this->record;
+    }
   }
 
   function __toString() {
@@ -56,59 +240,124 @@ abstract class DssModsDoc {
 
   }
 
-/*
-  title
-description.note
-creator
-  subject.lcsh
-publisher.original
-date.original
-  format.medium
-format.extent
-description
-  description.condition
-description.provenance
-description.series
-  identifier.itemnumber
-publisher.digital
-format.digital
-  source
-rights.digital
-relation.IsPartOf
- */
 
-/*
-      $template_map = array('Title' => "./mods:titleInfo/mods:title",
-			    'Description.Note' => "./mods:note[@type='description']",
-			    'Creator' => array('xpath' => "./mods:name/mods:role/mods:roleTerm[text() = 'cre']/../../mods:namePart",
-					       'facet' => true),
-			    'Subject.LCSH' => array('xpath' => "./mods:subject[@authority='lcsh']/mods:topic",
-						    'facet' => true),
-			    'Publisher.Original' => array('xpath' => "./mods:originInfo/mods:publisher",
-							  'facet' => true),
-			    'Date.Original' => array('xpath' => "./mods:originInfo/mods:dateCreated",
-						      'facet' => true,
-						      'date' => true),
-			    'Format.Medium' => array('xpath' => './mods:physicalDescription/mods:form',
-						     'facet' => true),
-			    'Format.Extent' => "./mods:physicalDescription/mods:extent",
-			    'Description' => "./mods:abstract",
-			    'Description.Provenance' => "./mods:note[@type='ownership']",
-			    'Description.Series' => array('xpath' => "./mods:note[@type='series']",
-							  'facet' => true),
-			    'Identifier.ItemNumber' => array('xpath' => "./mods:identifier[@type='item-number']",
-							     'facet' => true),
-			    'Rights.Digital' => "./mods:accessCondition",
-			    'Publisher.Digital' => "./mods:note[@type='statement of responsibility']",
-			    'Source' => array('xpath' => './mods:location/mods:physicalLocation',
-					      'facet' => true,
-					      'field' => 'mdl_prints.source'),
-			    'Relation.IsPartOf' => array('xpath' => "./mods:note[@type='admin']",
-							 'facet' => true,
-							 'field' => 'cdm.Relation.IsPartOf'),
-			    'Format.Digital' => "./mods:note[@type='digital format']",
-			    );
- */
+class EastAsiaModsDoc extends DssModsDoc {
+
+  // @todo Refactor with DssMods within bootstrap_dss_digital
+  static public $fields_xpath_solr_map = array('Title.English' => "./mods:titleInfo/mods:title",
+					       'Title.English' => "./mods:titleInfo/mods:title[@xml:lang='en-US']",
+					       'Title.Japanese' => "./mods:titleInfo/mods:title[@xml:lang='Jpan']",
+					       'Title.Chinese' => "./mods:titleInfo/mods:title[@xml:lang='zh']",
+					       'Title.Korean' => "./mods:titleInfo/mods:title[@xml:lang='Kore']",
+					       'Subject.OCM' => array('xpath' => "./mods:subject[@authorityURI='http://www.yale.edu/hraf/outline.htm']/mods:topic",
+								      'facet' => true),
+
+					       'Description.Critical' => "./mods:note[@type='content']",
+					       'Description.Indicia' => array('xpath' => "./mods:note[@type='indicia']",
+									      'facet' => true),
+
+					       'Description.Inscription.Japanese' => './mods:note[@type="handwritten" and @xml:lang="Jpan"]',
+
+					       'Description.Text.English' => './mods:abstract[@xml:lang="en-US"]',
+					       'Description.Text.Chinese' => "./mods:abstract[@xml:lang='zh']",
+					       'Description.Text.Japanese' => "./mods:abstract[@xml:lang='Jpan']",
+					       'Description.Text.Korean' => "./mods:abstract[@xml:lang='Kore']",
+					       
+					       'Coverage.Location' => array('xpath' => "./mods:subject/mods:geographic",
+									    'facet' => true),
+					       'Coverage.Location.Country' => array('xpath' => "./mods:subject/mods:hierarchicalGeographic/mods:country",
+										    'facet' => true),
+					       'Description.Ethnicity' => array('xpath' => "./mods:note[@type='ethnicity']",
+										'facet' => true),
+					       'Relation.SeeAlso' => './mods:relatedItem[@displayLabel="See also" and @type="references"]/mods:note[@type="citation"]',
+					       'Contributor' => array('xpath' => "./mods:name/mods:role/mods:roleTerm[text()='ctb']/../../mods:namePart",
+								      'facet' => true,
+								      'field' => 'eastasia.Contributors.Digital'),
+
+					       'Relation.IsPartOf' => array('xpath' => "./mods:note[@type='admin']",
+									    'field' => 'cdm.Relation.IsPartOf', // Work-around; Resolve using Solr interface
+									    'facet' => true),
+					       
+					       'Description.Citation' => "./mods:note[@type='citation']",
+					       'Format.Medium' => array('xpath' => "./mods:physicalDescription/mods:form",
+									'field' => 'eastasia.Format.Medium', // Work-around; Resolve using Solr interface
+									'facet' => true),
+					       
+					       'Creator.Company' => array('xpath' => "./mods:originInfo/mods:publisher",
+									  'field' => 'eastasia.Creator.Company', // Work-around; Resolve using Solr interface
+									  'facet' => true),
+					       
+					       'Creator.Maker' => array('xpath' => "./mods:name/mods:role/mods:roleTerm[text()='pht']/../../mods:namePart",
+									'field' => 'eastasia.Creator.Maker', // Work-around; Resolve using Solr interface
+									'facet' => true),
+					       'Format.Extent' => "./mods:physicalDescription/mods:extent",
+					       
+					       'Date.Artifact.Upper' => array('xpath' => "./mods:originInfo/mods:dateIssued[@point='end']",
+									      'facet' => true,
+									      'field' => 'eastasia.Date.Artifact.Upper', // Work-around; Resolve using Solr interface
+									      'date' => true),
+					       'Date.Artifact.Lower' => array('xpath' => "./mods:originInfo/mods:dateIssued[@point='start']",
+									      'facet' => true,
+									      'field' => 'eastasia.Date.Artifact.Lower', // Work-around; Resolve using Solr interface
+									      'date' => true),
+					       'Date.Image.Upper' => array('xpath' => "./mods:originInfo/mods:dateCreated[@point='end']",
+									   'facet' => true,
+									   'field' => 'eastasia.Date.Image.Upper', // Work-around; Resolve using Solr interface
+									   'date' => true),
+					       'Date.Image.Lower' => array('xpath' => "./mods:originInfo/mods:dateCreated[@point='start']",
+									   'facet' => true,
+									   'field' => 'eastasia.Date.Image.Lower', // Work-around; Resolve using Solr interface
+									   'date' => true),
+					       'Date.Original' => array('xpath' => "./mods:originInfo/mods:dateOther[@type='original']",
+									'facet' => true,
+									'date' => true),
+					       'Contributor.Donor' => "./mods:note[@type='acquisition']",
+					       );
+
+  function __construct($xmlstr = NULL,
+		       $project = NULL, $item = NULL,
+		       $record = NULL) {
+
+    parent::__construct($xmlstr,
+		       $project, $item,
+		       $record);
+
+    $this->set_record();
+  }
+
+  public function set_record($date_format = 'Y-m-d') {
+
+    foreach(self::$fields_xpath_solr_map as $field => $value) {
+
+      $xpath = $value;
+      if(is_array($value)) {
+
+	$xpath = $value['xpath'];
+      }
+
+      foreach($this->doc->xpath($xpath) as $xml_element) {
+
+	$field_qualifiers = explode('.', $field);
+	$element = array_shift($field_qualifiers);
+	$label = implode('.', $field_qualifiers);
+	$data = (string) $xml_element;
+	if(!is_null($date_format) and $element == 'Date') {
+
+	  $date = new DateTime($data);
+	  $data = $date->format($date_format);
+	}
+
+	$this->record->fields[$field] = new DssMetaDbAdminDescField($element, $label, $data);
+      }
+    }
+  }
+
+  public function to_csv() {
+
+    return (string) $this->record;
+  }
+}
+
 
 class MdlPrintsModsDoc extends DssModsDoc {
 
