@@ -77,10 +77,6 @@ function drush_islandora_dss_islandora_east_asia_mods_export_collection($collect
 
     $i++;
   }
-  //print_r($records);
-  //print_r( $records->to_csv());
-  //print_r($records->toArray());
-  //print_r($records);
 
   if(!is_null($file_path)) {
 

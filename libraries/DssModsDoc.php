@@ -243,7 +243,87 @@ abstract class DssModsDoc {
 
 class EastAsiaModsDoc extends DssModsDoc {
 
+  // This is the ordering from MetaDB
+  static public $fields_xpath_metadb_map = array('Title.English' => "./mods:titleInfo/mods:title",
+						 'Title.English' => "./mods:titleInfo/mods:title[@xml:lang='en-US']",
+						 'Title.Chinese' => "./mods:titleInfo/mods:title[@xml:lang='zh']",
+						 'Title.Japanese' => "./mods:titleInfo/mods:title[@xml:lang='Jpan']",
+						 'Title.Korean' => "./mods:titleInfo/mods:title[@xml:lang='Kore']",
+
+						 'Subject.OCM' => array('xpath' => "./mods:subject[@authorityURI='http://www.yale.edu/hraf/outline.htm']/mods:topic",
+									'facet' => true),
+
+						 'Description.Critical' => "./mods:note[@type='content']",
+						 'Description.Text.English' => './mods:abstract[@xml:lang="en-US"]',
+						 //'Description.Text.Chinese' => "./mods:abstract[@xml:lang='zh']", // This field is not present for all MetaDB projects (imperial-postcards)
+						 //'Description.Text.Korean' => "./mods:abstract[@xml:lang='Kore']", // This field is not present for all MetaDB projects (imperial-postcards)
+						 'Description.Text.Japanese' => "./mods:abstract[@xml:lang='Jpan']",
+						 'Description.Inscription.English' => './mods:note[@type="handwritten" and @xml:lang="en-US"]', // Not requested from P. Barclay
+						 'Description.Inscription.Japanese' => './mods:note[@type="handwritten" and @xml:lang="Jpan"]',
+						 'Description.Ethnicity' => array('xpath' => "./mods:note[@type='ethnicity']",
+										  'facet' => true),
+
+						 'Coverage.Location.Country' => array('xpath' => "./mods:subject/mods:hierarchicalGeographic/mods:country",
+										      'facet' => true),					       
+						 'Coverage.Location' => array('xpath' => "./mods:subject/mods:geographic",
+									      'facet' => true),
+
+						 'Format.Medium' => array('xpath' => "./mods:physicalDescription/mods:form",
+									  'field' => 'eastasia.Format.Medium', // Work-around; Resolve using Solr interface
+									  'facet' => true),
+
+					       'Description.Indicia' => array('xpath' => "./mods:note[@type='indicia']",
+									      'facet' => true),
+
+					       'Creator.Maker' => array('xpath' => "./mods:name/mods:role/mods:roleTerm[text()='pht']/../../mods:namePart",
+									'field' => 'eastasia.Creator.Maker', // Work-around; Resolve using Solr interface
+									'facet' => true),
+					       'Creator.Company' => array('xpath' => "./mods:originInfo/mods:publisher",
+									  'field' => 'eastasia.Creator.Company', // Work-around; Resolve using Solr interface
+									  'facet' => true),
+
+					       'Description.Citation' => "./mods:note[@type='citation']",
+					       'Relation.SeeAlso' => './mods:relatedItem[@displayLabel="See also" and @type="references"]/mods:note[@type="citation"]',
+					       'Contributor' => array('xpath' => "./mods:name/mods:role/mods:roleTerm[text()='ctb']/../../mods:namePart",
+								      'facet' => true,
+								      'field' => 'eastasia.Contributors.Digital'),
+
+						 'Date.Original' => array('xpath' => "./mods:originInfo/mods:dateOther[@type='original']",
+									'facet' => true,
+									'date' => true),					       
+						 'Date.Artifact.Upper' => array('xpath' => "./mods:originInfo/mods:dateIssued[@point='end']",
+										'facet' => true,
+										'field' => 'eastasia.Date.Artifact.Upper', // Work-around; Resolve using Solr interface
+										'date' => true),
+						 'Date.Artifact.Lower' => array('xpath' => "./mods:originInfo/mods:dateIssued[@point='start']",
+										'facet' => true,
+										'field' => 'eastasia.Date.Artifact.Lower', // Work-around; Resolve using Solr interface
+										'date' => true),
+						 'Date.Image.Upper' => array('xpath' => "./mods:originInfo/mods:dateCreated[@point='end']",
+									     'facet' => true,
+									     'field' => 'eastasia.Date.Image.Upper', // Work-around; Resolve using Solr interface
+									     'date' => true),
+						 'Date.Image.Lower' => array('xpath' => "./mods:originInfo/mods:dateCreated[@point='start']",
+									     'facet' => true,
+									     'field' => 'eastasia.Date.Image.Lower', // Work-around; Resolve using Solr interface
+									     'date' => true),
+						 // date.search was excluded
+						 'Date.Search' => NULL,
+						 // identifier.dmrecord was excluded
+						 'Identifier.Dmrecord' => NULL,
+						 'Format.Extent' => "./mods:physicalDescription/mods:extent",
+						 'Relation.IsPartOf' => array('xpath' => "./mods:note[@type='admin']",
+									      'field' => 'cdm.Relation.IsPartOf', // Work-around; Resolve using Solr interface
+									      'facet' => true),
+						 'Format.Digital' => './mods:note[@type="digital format"]',
+						 'Publisher.Digital' => './mods:note[@type="statement of responsibility"]',
+						 'Rights.Digital' => './mods:accessCondition'
+						 // 'Contributor.Donor' => "./mods:note[@type='acquisition']", // This field was appended for collections contributed by Richard Mammana
+						 );
+
   // @todo Refactor with DssMods within bootstrap_dss_digital
+  // @todo Refactor for ordering
+  // This is the ordering from bootstrap_dss_digital
   static public $fields_xpath_solr_map = array('Title.English' => "./mods:titleInfo/mods:title",
 					       'Title.English' => "./mods:titleInfo/mods:title[@xml:lang='en-US']",
 					       'Title.Japanese' => "./mods:titleInfo/mods:title[@xml:lang='Jpan']",
@@ -314,6 +394,18 @@ class EastAsiaModsDoc extends DssModsDoc {
 					       'Contributor.Donor' => "./mods:note[@type='acquisition']",
 					       );
 
+  // Please note that these were captured for the project "imperial-postcards"
+  private static $delimited_fields = array('subject.ocm',
+					   'description.ethnicity',
+					   'coverage.location.country',
+					   'coverage.location',
+					   'format.medium',
+					   'description.indicia',
+					   'creator.maker',
+					   'creator.company',
+					   'contributor',
+					   'relation.ispartof');
+
   function __construct($xmlstr = NULL,
 		       $project = NULL, $item = NULL,
 		       $record = NULL) {
@@ -327,7 +419,7 @@ class EastAsiaModsDoc extends DssModsDoc {
 
   public function set_record($date_format = 'Y-m-d') {
 
-    foreach(self::$fields_xpath_solr_map as $field => $value) {
+    foreach(self::$fields_xpath_metadb_map as $field => $value) {
 
       $xpath = $value;
       if(is_array($value)) {
@@ -335,19 +427,38 @@ class EastAsiaModsDoc extends DssModsDoc {
 	$xpath = $value['xpath'];
       }
 
-      foreach($this->doc->xpath($xpath) as $xml_element) {
+      $field_qualifiers = explode('.', $field);
+      $element = array_shift($field_qualifiers);
+      $label = implode('.', $field_qualifiers);
+      $data = '';
 
-	$field_qualifiers = explode('.', $field);
-	$element = array_shift($field_qualifiers);
-	$label = implode('.', $field_qualifiers);
-	$data = (string) $xml_element;
-	if(!is_null($date_format) and $element == 'Date') {
+      $metadb_field = strtolower($field);
 
-	  $date = new DateTime($data);
-	  $data = $date->format($date_format);
+      // Handling for empty values
+      $this->record->fields[$metadb_field] = new DssMetaDbAdminDescField($element, $label, $data);
+      
+      // Handling for excluded paths (i. e. paths with a NULL value)
+      if(!is_null($xpath)) {
+
+	foreach($this->doc->xpath($xpath) as $xml_element) {
+
+	  $value = (string) $xml_element;
+	  if(!is_null($date_format) and $element == 'Date') {
+
+	    $date = new DateTime($data);
+	    $value = $date->format($date_format);
+	  }
+
+	  if(in_array($metadb_field, self::$delimited_fields)) {
+
+	    $data .= $value . ';';
+	  } else {
+
+	    $data = $value;
+	  }
 	}
 
-	$this->record->fields[$field] = new DssMetaDbAdminDescField($element, $label, $data);
+	$this->record->fields[$metadb_field] = new DssMetaDbAdminDescField($element, $label, $data);
       }
     }
   }
