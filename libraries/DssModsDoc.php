@@ -99,8 +99,12 @@ class DssMetaDbRecord {
 
     if(preg_match('/[,"]/', $data)) {
 
-      $data = "\"$data\"";
+      //$data = "\"$data\"";
     }
+
+    // Work-around
+    // @todo Refactor
+    $data = preg_replace('/"""/', '"', $data);
 
     return $data;
   }
@@ -443,9 +447,10 @@ class EastAsiaModsDoc extends DssModsDoc {
 	foreach($this->doc->xpath($xpath) as $xml_element) {
 
 	  $value = (string) $xml_element;
-	  if(!is_null($date_format) and $element == 'Date') {
 
-	    $date = new DateTime($data);
+	  if(!is_null($date_format) and !empty($value) and $element == 'Date') {
+
+	    $date = new DateTime($value);
 	    $value = $date->format($date_format);
 	  }
 

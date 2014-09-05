@@ -54,13 +54,7 @@ function drush_islandora_dss_islandora_east_asia_mods_export_collection($collect
   $solr_query = "cdm.Relation.IsPartOf:\"$collection_name\"";
   $solr_results = $index->search($solr_query, array('fl' => 'PID dc.title'));
 
-  $i = 0;
   foreach($solr_results['response']['docs'] as $solr_doc) {
-
-    if($i > 9) {
-
-      break;
-    }
 
     $object = islandora_object_load($solr_doc['PID']);
 
@@ -75,7 +69,6 @@ function drush_islandora_dss_islandora_east_asia_mods_export_collection($collect
 				    $item,
 				    $record);
 
-    $i++;
   }
 
   if(!is_null($file_path)) {
