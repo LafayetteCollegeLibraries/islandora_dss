@@ -13,9 +13,16 @@ class IslandoraSession {
   private $islandora_load_callback;
 
   function __construct($connection,
+		       $fgs_user = 'fgsAdmin', $fgs_pass = 'secret',
+		       $fgs_url = 'http://localhost:8080/fedoragsearch',
+		       $solr_url = 'http://localhost:8080/solr/fedora',
 		       $islandora_load_callback = 'islandora_object_load') {
 
     $this->connection = $connection;
+
+    $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora' . '/');
+    $this->index = new IslandoraSolrIndex($solr, $fgs_user, $fgs_pass, $fgs_url);
+
     $this->islandora_load_callback = $islandora_load_callback;
   }
 
@@ -132,8 +139,11 @@ class IslandoraObject implements Serializable {
 
       $this->object = $object;
     } elseif(!is_null($pid)) {
-      
+
       $this->object = (object) array('id' => $pid);
+    } else {
+
+      throw new Exception('Failed to pass a Fedora Commons PID value for an Islandora Object');
     }
 
     $this->id = $this->object->id;

@@ -505,6 +505,14 @@ function islandora_dss_drush_command() {
 	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
 	  'aliases' => array(''));
 
+  $items['islandora-solr-clean-dates'] =
+    array(
+	  'description' => dt('Update the Solr index for any given collection'),
+	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
+			       'arg2' => dt('Fedora Generic Search user password')),
+	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
+	  'aliases' => array(''));
+
   $items['islandora-solr-update-object'] =
     array('description' => dt('Update the Solr index for any given collection'),
 	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),

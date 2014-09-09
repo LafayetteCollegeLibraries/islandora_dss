@@ -1498,3 +1498,32 @@ function islandora_dss_menu_alter(&$items) {
 
   $items['islandora/object/%islandora_object']['access callback'] = 'islandora_dss_object_access_callback';
 }
+
+/**
+ * Retrieve the Session Object for Islandora
+ * Session Objects provide an interface for Fedora Generic Search and Apache Solr
+ *
+ */
+function islandora_dss_get_session($user = NULL, $url = NULL, $user_string = NULL, $pass_string = NULL,
+				   $fgs_user = 'fgsAdmin', $fgs_pass = 'secret',
+				   $fgs_url = 'http://localhost:8080/fedoragsearch',
+				   $solr_url = 'http://localhost:8080/solr/fedora') {
+
+  $session = &drupal_static(__FUNCTION__);
+
+  if(!$session) {
+
+    try {
+
+      $session = new IslandoraSession(islandora_get_tuque_connection($user, $url, $user_string, $pass_string), $fgs_user, $fgs_pass);
+    } catch (Exception $e) {
+
+      drupal_set_message(t('Unable to establish an Islandora Session: %error', array('%error' => $e)), 'error');
+    }
+  } else {
+
+    return NULL;
+  }
+
+  return $session;
+}
