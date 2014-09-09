@@ -1,0 +1,14 @@
+{
+    "name": "islandora_dss",
+    "description": "Islandora Libraries and Functionality for Digital Scholarship Services",
+    "homepage": "https://github.com/LafayetteCollegeLibraries/islandora_dss",
+    "authors": [{
+    	       "name": "James R. Griffin III",
+	       "email": "griffinj@lafayette.edu"
+	       }],
+    "require-dev": {
+
+	        "php": ">=5.0.5",
+		"phpunit/phpunit": "4.1.*"
+	}
+}
