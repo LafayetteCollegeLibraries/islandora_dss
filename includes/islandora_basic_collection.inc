@@ -67,3 +67,27 @@ function islandora_dss_get_collection($pid, $label = NULL, $parent_collection = 
 
   return $collection;
 }
+
+/**
+ * Add parent relationships for an Object
+ *
+ */
+function drush_islandora_dss_islandora_set_parent($child_pid, $parent_pid) {
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $child = islandora_object_load($child_pid);
+
+  $child->relationships->add(FEDORA_RELS_EXT_URI, 'isMemberOfCollection', $parent_pid);
+}
+
+/**
+ * Remove parent relationships for an Object
+ *
+ */
+function drush_islandora_dss_islandora_unset_parent($child_pid) {
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $child = islandora_object_load($child_pid);
+
+  $child->relationships->remove(FEDORA_RELS_EXT_URI, 'isMemberOfCollection');
+}

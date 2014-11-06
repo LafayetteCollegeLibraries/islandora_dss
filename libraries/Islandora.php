@@ -128,6 +128,10 @@ class IslandoraSolrIndex {
 
 class IslandoraObject implements Serializable {
 
+  protected $session;
+  protected $connection;
+  protected $object;
+  
   public $id;
 
   function __construct($session, $pid = NULL, $object = NULL) {
@@ -195,8 +199,19 @@ class IslandoraObject implements Serializable {
       throw new Exception("$ds_id is not managed as an inline XML Datastream");
     }
 
-    $xml_str = preg_replace("/<$xpath>(.+?)<\/$xpath>/", "<$xpath>$value</$xpath>", $ds->content);
-    $ds->setContentFromString($xml_str);
+    if(preg_match("/<$xpath>(.+?)<\/$xpath>/", $ds->content)) {
+
+      $xml_str = preg_replace("/<$xpath>(.+?)<\/$xpath>/", "<$xpath>$value</$xpath>", $ds->content);
+      $ds->setContentFromString($xml_str);
+    } else {
+
+      //$ds_doc = new SimpleXmlElement($ds->content);
+      $dc_doc = new DOMDocument();
+      $dc_doc->loadXML($this->object['DC']->content);
+      $dc_doc->documentElement->appendChild( $dc_doc->createElementNS('http://purl.org/dc/elements/1.1/', $xpath, $value) );
+
+      $ds->setContentFromString($dc_doc->saveXML());
+    }
 
     /*
     exit(1);

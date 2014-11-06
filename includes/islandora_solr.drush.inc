@@ -53,10 +53,10 @@ function drush_islandora_dss_islandora_solr_update_collection($cdm_collection, $
   }
 }
 
-function islandora_dss_update_index($solr_doc, $fedoragsearch_url, $fedoragsearch_user, $fedoragsearch_pwd) {
+function islandora_dss_update_index($object_pid, $fedoragsearch_url, $fedoragsearch_user, $fedoragsearch_pwd) {
 
     // Build the GET request
-    $params = array('operation' => 'updateIndex', 'action' => 'fromPid', 'value' => $solr_doc['PID']);
+    $params = array('operation' => 'updateIndex', 'action' => 'fromPid', 'value' => $object_pid);
     $url = $fedoragsearch_url . '/rest?' . http_build_query($params);
 
     // Initialize the cURL handler
@@ -72,10 +72,10 @@ function islandora_dss_update_index($solr_doc, $fedoragsearch_url, $fedoragsearc
     // Handle all cURL errors
     if(curl_errno($ch)) {
 
-      drush_log("Failed to update the Document for " . $solr_doc['PID'] . ":" . curl_error($ch), 'error');
+      drush_log("Failed to update the Document for " . $object_pid . ":" . curl_error($ch), 'error');
     } else {
 
-      drush_log("Updated the Document for " . $solr_doc['PID'], 'success');
+      drush_log("Updated the Document for " . $object_pid, 'success');
     }
 
     curl_close($ch);
@@ -157,7 +157,7 @@ function drush_islandora_dss_islandora_solr_clean_dates($cdm_collection, $fedora
 	    //print $date_element;
 
 	    // Update
-	    islandora_dss_update_index($solr_doc,
+	    islandora_dss_update_index($solr_doc['PID'],
 				       $fedoragsearch_url,
 				       $fedoragsearch_user,
 				       $fedoragsearch_pwd);

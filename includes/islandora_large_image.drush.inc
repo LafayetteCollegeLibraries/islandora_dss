@@ -70,6 +70,24 @@ function drush_islandora_dss_islandora_large_image_ingest($path, $namespace = NU
   return $object;
   }
 
+function drush_islandora_dss_islandora_large_image_derive($object_pid) {
+
+  // Instantiate the connection as the admin user
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $object = islandora_object_load($object_pid);
+
+  // Generate the derivatives for the Islandora Large Image
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+  if(!islandora_large_image_create_all_derivatives($object)) {
+
+    drush_log(dt("Failed to generated the derivatives for the Large Image Object @object_id", array('@object_id' => $object->id)), 'error');
+  } else {
+
+    drush_log(dt("Successfully generated the derivatives for the Large Image Object @object_id", array('@object_id' => $object->id)), 'success');
+  }
+}
+
 function drush_islandora_dss_islandora_large_image_datastream_labels($collection) {
 
   $ISLANDORA_DSS_LABELED_DS_IDS_LARGE_IMAGE_EAIC = array('TN', 'MODS', 'OBJ', 'JPG');
