@@ -113,16 +113,16 @@ function islandora_dss_drush_command() {
 
   $items['islandora-update-ds'] =
     array(
-	  'description' => dt('Update the a datastream for an Islandora Object'),
-	  'arguments' => array('arg1' => dt('the Fedora Commons Object PID'),
-			       'arg2' => dt('the Datastream ID'),
-			       'arg3' => dt('the Datastream label'),
-			       'arg4' => dt('the file path for the Datastream content')
+	  'description' => dt('Update/Insert the a datastream for an Islandora Object'),
+	  'arguments' => array('arg1' => dt('The Fedora Commons Object PID'),
+			       'arg2' => dt('The Datastream ID'),
+			       'arg3' => dt('The Datastream label'),
+			       'arg4' => dt('The file path for the Datastream content'),
+			       'arg5' => dt('The type of datastream being updated (e. g. managed, inline XML, redirect...)')
 			       ),
-	  'examples' => array('Standard example' => 'drush islandora-update-dc islandora:object1 object1.mods.xml',
-			      'Argument example' => 'drush islandora-update-dc islandora:object1 object1.mods.xml dc_to_mods.xslt',
+	  'examples' => array('Argument example' => 'drush islandora-update-dc islandora:object1 MODS "MODS Document" object1.mods.xml MODS',
 			      ),
-	  'aliases' => array('iuds'));
+	  'aliases' => array('ds-up'));
 
   // This was implemented in response to DSS-360
   $items['islandora-ingest-mods-m'] =
@@ -275,6 +275,11 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
     array(
 	  'description' => dt('Clean the thumbnail images for Islandora Objects by regenerating thumbnails for placeholders'),
 	  'aliases' => array('lg-img-tn-clean'));
+
+  $items['islandora-large-image-derive-jpeg'] =
+    array(
+	  'description' => dt(''),
+	  'aliases' => array(''));
 
   /**
    * Islandora "tokens" Module tasks
@@ -461,8 +466,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
   $items['islandora-mdl-prints-ingest'] =
     array('description' => dt('Ingest a master TIFF file into an Islandora Large Image Object for the Marquis de Lafayette Prints Collection'),
 	  'aliases' => array());
+
   $items['islandora-mdl-prints-append-source'] =
     array('description' => dt('Append "Source" field values for the Marquis de Lafayette Prints Collection'),
+	  'aliases' => array());
+
+  $items['islandora-mdl-prints-derive-jpeg'] =
+    array('description' => dt(''),
 	  'aliases' => array());
 
   /**
@@ -1015,32 +1025,7 @@ function drush_islandora_dss_islandora_update_dc($obj_pid, $mods_file_path, $dc_
   $dc_datastream->setContentFromString($transformed_dc_doc->saveXML());
 }
 
-/**
- * @author griffinj@lafayette.edu
- * Update an Object's datastream
- *
- * Default to managed content for the datastream
- */
-function drush_islandora_dss_islandora_update_ds($obj_pid, $ds_id, $ds_label, $ds_content_file_path, $control_group='M') {
 
-  // Get the connection
-  $connection = islandora_get_tuque_connection(user_load(1), $url);
-  
-  $object = islandora_object_load($obj_pid);
-
-  if(empty($object[$ds_id])) {
-
-    $datastream = $object->constructDatastream($ds_id, $control_group);
-    $datastream->label = $ds_label;
-    $object->ingestDatastream($datastream);
-    $created = TRUE;
-  } else {
-
-    $datastream = $object[$ds_id];
-  }
-
-  $datastream->setContentFromFile($ds_content_file_path);
-}
 
 function drush_islandora_dss_islandora_ri_search($title, $url='http://localhost:8080/fedora') {
 

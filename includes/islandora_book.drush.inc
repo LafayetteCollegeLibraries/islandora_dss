@@ -122,11 +122,14 @@ function drush_islandora_dss_islandora_book_elc_ingest($dir_path, $label, $book_
 
       if(!preg_match('/(ELCv\d)_(.+?)\.tif/', $file_name, $m)) {
 
-	exit(1);
+	drush_log('Could not parse the file name for ' . $file_name, 'warning');
+	continue;
       } else {
 
-	$page_pid = $m[1] . ':' . $m[2];
-	drush_log("Ingesting {$file->uri} as $page_pid and appending it to $book_pid...", 'ok');
+	//$page_pid = $m[1] . ':' . $m[2];
+	//drush_log("Ingesting {$file->uri} as $page_pid and appending it to $book_pid...", 'ok');
+	$page_pid = 'elc';
+	drush_log("Ingesting {$file->uri} and appending it to $book_pid...", 'ok');
 	islandora_dss_book_page_ingest($file, $book_pid, $file_name, $page_pid);
       }
     }

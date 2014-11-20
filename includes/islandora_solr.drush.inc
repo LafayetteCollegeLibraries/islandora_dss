@@ -53,6 +53,7 @@ function drush_islandora_dss_islandora_solr_update_collection($cdm_collection, $
   }
 }
 
+
 function islandora_dss_update_index($object_pid, $fedoragsearch_url, $fedoragsearch_user, $fedoragsearch_pwd) {
 
     // Build the GET request
@@ -80,6 +81,13 @@ function islandora_dss_update_index($object_pid, $fedoragsearch_url, $fedoragsea
 
     curl_close($ch);
 }
+
+/*
+function drush_islandora_dss_islandora_solr_update_object($object_pid, $fedoragsearch_url, $fedoragsearch_user, $fedoragsearch_pwd) {
+
+  return islandora_dss_update_index($object_pid, $fedoragsearch_url, $fedoragsearch_user, $fedoragsearch_pwd);
+}
+*/
 
 /**
  * Cleaning dates for Objects within a given collection

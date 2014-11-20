@@ -30,6 +30,28 @@ function drush_islandora_dss_islandora_mdl_prints_ingest($file_path) {
 
   }
 
+function drush_islandora_dss_islandora_mdl_prints_derive_jpeg($obj_pid) {
+
+  $object = islandora_object_load($obj_pid);
+
+  $collection = 'Marquis de Lafayette Prints Collection';
+  $publisher = 'Lafayette College Libraries';
+
+  $path = 'islandora/object/' . $object->id;
+  $alias = drupal_get_path_alias($path);
+
+  global $base_url;
+  $url = $base_url . '/' . $alias;
+
+  $url = preg_replace('/\.stage/', '', $url);
+  $url = preg_replace('/\.dev/', '', $url);
+
+  print $url;
+
+  exit(1);
+}
+
+
 function drush_islandora_dss_islandora_mdl_prints_append_source($collection_name = 'Marquis de Lafayette Prints Collection') {
 
   $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  

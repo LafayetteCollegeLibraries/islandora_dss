@@ -211,3 +211,31 @@ function drush_islandora_dss_islandora_dc_update($obj_pid, $src_ds_id, $dest_ds_
   $dest_ds = $object[$dest_ds_id];
   $dest_ds->setContentFromString($dest_doc_xml);
 }
+
+/**
+ * @author griffinj@lafayette.edu
+ * Update an Object's datastream
+ *
+ * Default to managed content for the datastream
+ */
+function drush_islandora_dss_islandora_update_ds($obj_pid, $ds_id, $ds_label, $ds_content_file_path, $control_group='M') {
+
+  // Get the connection
+  $connection = islandora_get_tuque_connection(user_load(1), $url);
+  
+  $object = islandora_object_load($obj_pid);
+
+  if(empty($object[$ds_id])) {
+
+    $datastream = $object->constructDatastream($ds_id, $control_group);
+    $datastream->label = $ds_label;
+    $object->ingestDatastream($datastream);
+    $created = TRUE;
+  } else {
+
+    $datastream = $object[$ds_id];
+  }
+
+  $datastream->setContentFromFile($ds_content_file_path);
+}
+

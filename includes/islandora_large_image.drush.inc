@@ -70,6 +70,12 @@ function drush_islandora_dss_islandora_large_image_ingest($path, $namespace = NU
   return $object;
   }
 
+// Wrapper
+function drush_islandora_dss_islandora_large_image_derive_jpeg($pid, $connection = NULL, $collection_name = NULL, $path_alias = NULL, $is_back = FALSE) {
+
+  islandora_dss_generate_derivative_jpg_large_image($pid);
+}
+
 function drush_islandora_dss_islandora_large_image_derive($object_pid) {
 
   // Instantiate the connection as the admin user

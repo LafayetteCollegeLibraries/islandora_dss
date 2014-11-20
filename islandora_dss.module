@@ -903,6 +903,8 @@ function islandora_dss_generate_derivative_jpg_book($pid) {
   }
 }
 
+
+
 /**
  * Generate paths for Islandora Collection Objects
  *
