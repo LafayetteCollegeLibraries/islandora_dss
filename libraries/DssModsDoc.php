@@ -189,13 +189,14 @@ abstract class DssModsDoc {
 
   const MODS_XSD_URI = 'http://www.loc.gov/standards/mods/v3/mods-3-3.xsd';
 
-  public $pg;
+  //public $pg;
   public $doc;
   public $records;
   public $record;
 
   function __construct($xmlstr = NULL,
-		       $project = NULL, $item = NULL,
+		       $project = NULL,
+		       $item = NULL,
 		       $record = NULL) {
 
     if(!is_null($xmlstr)) {
@@ -209,7 +210,10 @@ abstract class DssModsDoc {
     $this->doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
 
     //$this->records = $records;
-    $this->record = $record;
+    if(!is_null($record)) {
+
+      $this->record = $record;
+    }
 
     if(!is_null($item)) {
 
@@ -243,6 +247,173 @@ abstract class DssModsDoc {
   }
 
   }
+
+class AlumniModsDoc extends DssModsDoc {
+  
+  static public $fields_xpath_solr_map = array('Title' => "./mods:titleInfo/mods:title",
+					       'Sub-Title' => "./mods:titleInfo/mods:title[@xml:lang='en-US']",
+					       'Part Number' => "./mods:titleInfo/mods:title[@xml:lang='Jpan']",
+					       'Personal Author' => "./mods:titleInfo/mods:title[@xml:lang='zh']",
+					       'Place of Publication' => "./mods:titleInfo/mods:title[@xml:lang='Kore']",
+					       'Publisher' => array('xpath' => "./mods:subject[@authorityURI='http://www.yale.edu/hraf/outline.htm']/mods:topic",
+								      'facet' => true),
+
+					       'Issue of' => "./mods:note[@type='content']",
+					       'Issue of' => array('xpath' => "./mods:note[@type='indicia']",
+									      'facet' => true),
+
+					       'Volume' => './mods:note[@type="handwritten" and @xml:lang="Jpan"]',
+
+					       'Issue' => './mods:abstract[@xml:lang="en-US"]',
+					       'Volume Number' => "./mods:abstract[@xml:lang='zh']",
+					       'Issue Number' => "./mods:abstract[@xml:lang='Jpan']",
+					       'Note' => "./mods:abstract[@xml:lang='Kore']",
+					       
+					       'Date of Publication' => array('xpath' => "./mods:subject/mods:geographic",
+									      'facet' => true),
+					       );
+
+  function __construct($csv_row, $xmlstr = NULL) {
+
+    parent::__construct($xmlstr);
+    
+    $this->set_record($csv_row);
+  }
+  
+  // <titleInfo> and all child elements
+  function add_title($values) {
+
+    $titleInfo = $this->doc->addChild('titleInfo');
+
+    $child_elements_map = array('nonSort',
+				'title',
+				'subTitle',
+				'partNumber');
+
+    foreach($values as $i => $value) {
+
+      $titleInfo->addChild($child_elements_map[$i], $value);
+    }
+  }
+
+  // <name> and all child elements
+  function add_name($values) {
+
+    $name = $this->doc->addChild('name');
+
+    $name['type'] = 'personal';
+    $name['authorityURI'] = array_shift($values);
+
+    $namePart = $name->addChild('namePart');
+    $displayForm = $name->addChild('displayForm', array_shift($values));
+
+    $type_map = array('family',
+		      'given',
+		      'date');
+
+    foreach($values as $i => $value) {
+    
+      $namePart = $name->addChild('namePart', array_shift($values));
+      $namePart['type'] = $type_map[$i];
+    }
+  }
+
+  // <originInfo and all child elements
+  function add_origin_info($values) {
+
+    $originInfo = $this->doc->addChild('originInfo');
+
+    $place = $originInfo->addChild('place');
+
+    //$placeTerm = $place->addChild('placeTerm', array_shift($values));
+    //$publisher = $originInfo->addChild('publisher', array_shift($values));
+
+    $publisher = $originInfo->addChild('publisher', array_pop($values));
+
+    $place_term_uri_map = array('Easton, PA' => '');
+    foreach($values as $value) {
+
+      $placeTerm = $place->addChild('placeTerm', $value);
+    }
+  }
+
+  // <relatedItem> and all child elements
+  // (Please note that this is to be deprecated in preference to using the isMemberOf predicate for Islandora Collection Objects
+  function add_related_item($values) {
+
+    foreach($values as $value) {
+
+      $relatedItem = $this->doc->addChild('relatedItem');
+      $titleInfo = $relatedItem->addChild('titleInfo');
+      $title = $titleInfo->addChild('title', $value);
+    }
+  }
+
+  function add_note($values) {
+
+    $note = $this->doc->addChild('note');
+
+    $note['type'] = 'source note'; // In compliance with Generic Descriptive Metadata (GDM); Please see http://www.loc.gov/standards/mods/mods-notes.html
+    $note['type'] = $values[0];
+  }
+
+  // <part> and all child elements
+  function add_part($values) {
+
+    $part = $this->doc->addChild('part');
+
+    $detail_type_map = array('volume',
+			     'issue');
+
+    // @todo Refactor
+    $date = $part->addChild('date', array_pop($values));
+    $date['encoding'] = 'iso8601';
+    $date['keyDate'] = 'yes';
+
+    $date = $part->addChild('date', array_pop($values));
+    $date['qualifier'] = 'approximate';
+
+    foreach(array_slice($values, 0, 2) as $i => $value) {
+
+      $detail = $part->addChild('detail', $value);
+      $detail['type'] = $detail_type_map[$i % 2];
+
+      //$title = $detail->addChild('title', (string) $this->doc->titleInfo->title . ' ' . $value);
+      
+      $number = $detail->addChild('number', $values[$i + 2]);
+    }
+  }
+
+  function set_record($csv_row) {
+
+    // Direct mapping
+    // "File", "TitleInfoNonSort","TitleInfoTitle","TitleInfoSubtitle","TitleInfoPartNumber",
+    // "Name_AuthorityURI","NamePart_DisplayForm_PersonalAuthor","NamePart_Family_PersonalAuthor","NamePart_Given_PersonalAuthor","NamePart_Date_PersonalAuthor",
+    // "OriginInfoPlaceTerm","OriginInfoPublisher",
+    // "RelatedItemHost_1_TitleInfoTitle","RelatedItemHost_2_TitleInfoTitle",
+    // "PartDetailTypeVolume","PartDetailTypeIssue","PartDetailTypeVolumeNumber","PartDetailTypeIssueNumber","Note","PartDate_NaturalLanguage","PartDate_ISO8601"
+
+    $title_values = array_slice($csv_row, 1, 4);
+    $this->add_title($title_values);
+
+    $name_values = array_slice($csv_row, 5, 5);
+    $this->add_name($name_values);
+
+    $origin_info_values = array_slice($csv_row, 10, 2);
+    $this->add_origin_info($origin_info_values);
+
+    $rel_item_values = array_slice($csv_row, 12, 2);
+    $this->add_related_item($rel_item_values);
+
+    $part_values = array_slice($csv_row, 14, 4);
+    $part_values = array_merge($part_values, array_slice($csv_row, 19, 2));
+
+    $this->add_part($part_values);
+
+    $note_values = array_slice($csv_row, 18, 1);
+    $this->add_note($note_values);
+  }
+}
 
 
 class EastAsiaModsDoc extends DssModsDoc {

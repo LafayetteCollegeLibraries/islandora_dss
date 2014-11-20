@@ -6,9 +6,44 @@
    *
    */
 
-function drush_islandora_dss_islandora_book_alumni_append_mods() {
+function drush_islandora_dss_islandora_book_alumni_append_mods($file) {
 
+  /**
+   * Document structure implemented by millerp
+   *
+   * "File","TitleInfoNonSort","TitleInfoTitle","TitleInfoSubtitle","TitleInfoPartNumber",
+   * "Name_AuthorityURI","NamePart_DisplayForm_PersonalAuthor","NamePart_Family_PersonalAuthor","NamePart_Given_PersonalAut
+   * hor","NamePart_Date_PersonalAuthor",
+   * "OriginInfoPlaceTerm","OriginInfoPublisher",
+   * "RelatedItemHost_1_TitleInfoTitle","RelatedItemHost_2_TitleInfoTitle",
+   * "PartDetailTypeVolume","PartDetailTypeIssue","PartDetailTypeVolumeNumber","PartDetailTypeIssueNumber","Note","PartDate_NaturalLanguage","PartDate_ISO8601"
+   *
+   */
+  
+  
+  
+}
+
+function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_path) {
+
+  $row = 1;
+  if(($csv_file = fopen($csv_file_path, "r")) !== FALSE) {
+
+    while(($data = fgetcsv($csv_file, 1000, ",")) !== FALSE) {
+      
+      $num = count($data);
+      echo "<p> $num fields in line $row: <br /></p>\n";
+      $row++;
+
+      for ($c=0; $c < $num; $c++) {
+
+	echo $data[$c] . "<br />\n";
+      }
+    }
+
+    fclose($csv_file);
   }
+}
 
 function drush_islandora_dss_islandora_book_alumni_append_pdf() {
 
