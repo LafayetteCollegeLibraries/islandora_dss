@@ -187,7 +187,7 @@ abstract class DssModsDoc {
 </mods>
     ';
 
-  const MODS_XSD_URI = 'http://www.loc.gov/standards/mods/v3/mods-3-3.xsd';
+  const MODS_XSD_URI = 'http://www.loc.gov/standards/mods/v3/mods-3-4.xsd';
 
   //public $pg;
   public $doc;
@@ -244,11 +244,20 @@ abstract class DssModsDoc {
   public function validate() {
 
     $doc = new DOMDocument('1.0');
+    $doc->loadXml($this->doc->asXml());
+
+    return $doc->schemaValidate(self::MODS_XSD_URI);
   }
 
   }
 
 class AlumniModsDoc extends DssModsDoc {
+
+  const MODS_XML = '
+<mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <typeOfResource>text</typeOfResource>
+</mods>
+    ';
   
   static public $fields_xpath_solr_map = array('Title' => "./mods:titleInfo/mods:title",
 					       'Sub-Title' => "./mods:titleInfo/mods:title[@xml:lang='en-US']",
@@ -275,8 +284,14 @@ class AlumniModsDoc extends DssModsDoc {
 
   function __construct($csv_row, $xmlstr = NULL) {
 
-    parent::__construct($xmlstr);
-    
+    if(!is_null($xmlstr)) {
+
+      parent::__construct($xmlstr);
+    } else {
+
+      parent::__construct(self::MODS_XML);
+    }
+
     $this->set_record($csv_row);
   }
   
@@ -292,7 +307,10 @@ class AlumniModsDoc extends DssModsDoc {
 
     foreach($values as $i => $value) {
 
-      $titleInfo->addChild($child_elements_map[$i], $value);
+      if(!empty($value)) {
+
+	$titleInfo->addChild($child_elements_map[$i], $value);
+      }
     }
   }
 
@@ -301,11 +319,18 @@ class AlumniModsDoc extends DssModsDoc {
 
     $name = $this->doc->addChild('name');
 
-    $name['type'] = 'personal';
-    $name['authorityURI'] = array_shift($values);
+    $authority_uri = array_shift($values);
+    if(!empty($authority_uri)) {
 
-    $namePart = $name->addChild('namePart');
-    $displayForm = $name->addChild('displayForm', array_shift($values));
+      $name['authorityURI'] = $authority_uri;
+    }
+    
+    $displayFormValue = array_shift($values);
+
+    if(!empty($displayFormValue)) {
+
+      $displayForm = $name->addChild('displayForm', $displayFormValue);
+    }
 
     $type_map = array('family',
 		      'given',
@@ -313,8 +338,21 @@ class AlumniModsDoc extends DssModsDoc {
 
     foreach($values as $i => $value) {
     
-      $namePart = $name->addChild('namePart', array_shift($values));
-      $namePart['type'] = $type_map[$i];
+      if(!empty($value)) {
+
+	$namePart = $name->addChild('namePart', $value);
+	$namePart['type'] = $type_map[$i];
+      }
+    }
+
+    $name_children = $name->children();
+
+    if(empty($name_children)) {
+
+      unset($this->doc->name);
+    } else {
+
+      $name['type'] = 'personal';
     }
   }
 
@@ -330,10 +368,11 @@ class AlumniModsDoc extends DssModsDoc {
 
     $publisher = $originInfo->addChild('publisher', array_pop($values));
 
-    $place_term_uri_map = array('Easton, PA' => '');
+    $place_term_uri_map = array('Easton, PA' => 'http://id.loc.gov/vocabulary/countries/pau');
     foreach($values as $value) {
 
       $placeTerm = $place->addChild('placeTerm', $value);
+      $placeTerm['type'] = 'text';
     }
   }
 
@@ -343,45 +382,86 @@ class AlumniModsDoc extends DssModsDoc {
 
     foreach($values as $value) {
 
-      $relatedItem = $this->doc->addChild('relatedItem');
-      $titleInfo = $relatedItem->addChild('titleInfo');
-      $title = $titleInfo->addChild('title', $value);
+      if(!empty($value)) {
+
+	$relatedItem = $this->doc->addChild('relatedItem');
+	$titleInfo = $relatedItem->addChild('titleInfo');
+	$title = $titleInfo->addChild('title', $value);
+      }
     }
   }
 
   function add_note($values) {
 
-    $note = $this->doc->addChild('note');
+    if(!empty($values[0])) {
 
-    $note['type'] = 'source note'; // In compliance with Generic Descriptive Metadata (GDM); Please see http://www.loc.gov/standards/mods/mods-notes.html
-    $note['type'] = $values[0];
+      $note = $this->doc->addChild('note', $values[0]);
+
+      $note['type'] = 'date/sequential designation'; // In compliance with Generic Descriptive Metadata (GDM); Please see http://www.loc.gov/standards/mods/mods-notes.html
+    }
   }
 
   // <part> and all child elements
   function add_part($values) {
 
-    $part = $this->doc->addChild('part');
+    $part = $this->doc->relatedItem->addChild('part');
+
+    //foreach($this->doc->relatedItem as $relatedItem) {
+
+    //$part = $relatedItem->addChild('part');
 
     $detail_type_map = array('volume',
 			     'issue');
 
     // @todo Refactor
-    $date = $part->addChild('date', array_pop($values));
+    $norm_date = array_pop($values);
+    $date = $part->addChild('date', $norm_date);
+    //$date = $part->addChild('date');
     $date['encoding'] = 'iso8601';
-    $date['keyDate'] = 'yes';
+
+    //$date_value = $date->addChild('date');
+
+    // Retrieve the datestamp within GMT
+    $gmt_date = new DateTime($norm_date, new DateTimeZone('America/New_York'));
+    $gmt_date_solr = preg_replace('/\+00\:00/', 'Z', $gmt_date->format('c'));
+
+    $date = $part->addChild('date', $gmt_date_solr);
+    $date['encoding'] = 'w3cdtf';
+    //$date['keyDate'] = 'yes'; //! This breaks validation (?)
 
     $date = $part->addChild('date', array_pop($values));
     $date['qualifier'] = 'approximate';
 
     foreach(array_slice($values, 0, 2) as $i => $value) {
 
-      $detail = $part->addChild('detail', $value);
+      //$detail = $part->addChild('detail', $value);
+      $text = $part->addChild('text', $value);
+      $detail = $part->addChild('detail');
+
+      /*
+      $node = dom_import_simplexml($detail);
+      $no = $node->ownerDocument;
+      $node->appendChild($no->createCDATASection($value));
+      $this->doc = new SimpleXmlElement($no->saveXML());
+
+      $part = $this->doc->relatedItem->part;
+      $detail = $part->detail[$i];
+      */
+
+      $text['type'] = $detail_type_map[$i % 2];
       $detail['type'] = $detail_type_map[$i % 2];
 
-      //$title = $detail->addChild('title', (string) $this->doc->titleInfo->title . ' ' . $value);
-      
       $number = $detail->addChild('number', $values[$i + 2]);
     }
+
+    /*
+    for($j=1;$j < count($this->doc->relatedItem);$j++) {
+
+      $dom = dom_import_simplexml($this->doc->relatedItem[$j]);
+      $partDom = dom_import_simplexml( simplexml_load_string($part->asXml()) );
+      $dom->appendChild($dom->ownerDocument->importNode($partDom, TRUE));
+    }
+    */
   }
 
   function set_record($csv_row) {
@@ -412,6 +492,8 @@ class AlumniModsDoc extends DssModsDoc {
 
     $note_values = array_slice($csv_row, 18, 1);
     $this->add_note($note_values);
+
+    return $this->validate();
   }
 }
 
