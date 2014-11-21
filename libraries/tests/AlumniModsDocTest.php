@@ -71,5 +71,15 @@ class AlumniModsDocTest extends PHPUnit_Framework_TestCase {
       $dom->formatOutput = true;
       $dom->loadXML($this->mods->doc->asXML());
       echo $dom->saveXML();
+
+      $this->record5 = array("lafalummag_20091000",'',"Lafayette Magazine",'','','','','','','',"Easton, PA","Lafayette College, Division of Communications","Lafayette Magazine",'','',"",'','',"","Fall ([October]), 2009","2009-10-01");
+
+      $this->mods = new AlumniModsDoc($this->record5);
+
+      $dom = new DOMDocument("1.0");
+      $dom->preserveWhiteSpace = false;
+      $dom->formatOutput = true;
+      $dom->loadXML($this->mods->doc->asXML());
+      echo $dom->saveXML();
     }
 }

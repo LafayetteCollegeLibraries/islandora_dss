@@ -1143,6 +1143,8 @@ function islandora_dss_book_page_ingest($file, $book_pid, $label = NULL, $page_p
 
   islandora_paged_content_update_datastream($object, drupal_realpath(property_exists($file, 'uri') ? $file->uri : $file ), 'OBJ', NULL, NULL, 'M', FALSE);
 
+  property_exists($file, 'uri');
+
   // Update RELS-EXT properties, page/sequence/etc, and append the page at the
   // end of the book.
   $rels_ext = $object->relationships;

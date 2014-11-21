@@ -13,15 +13,19 @@ class IslandoraSession {
   private $islandora_load_callback;
 
   function __construct($connection,
-		       $fgs_user = 'fgsAdmin', $fgs_pass = 'secret',
+		       $fgs_user = 'fgsAdmin',
+		       $fgs_pass = NULL,
 		       $fgs_url = 'http://localhost:8080/fedoragsearch',
 		       $solr_url = 'http://localhost:8080/solr/fedora',
 		       $islandora_load_callback = 'islandora_object_load') {
 
     $this->connection = $connection;
 
-    $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora' . '/');
-    $this->index = new IslandoraSolrIndex($solr, $fgs_user, $fgs_pass, $fgs_url);
+    if(!is_null($fgs_pass)) {
+
+      $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora' . '/');
+      $this->index = new IslandoraSolrIndex($solr, $fgs_user, $fgs_pass, $fgs_url);
+    }
 
     $this->islandora_load_callback = $islandora_load_callback;
   }
@@ -30,8 +34,40 @@ class IslandoraSession {
 
     return call_user_func($this->islandora_load_callback, $pid);
   }
+  
+  function get_objects($label = '?label',
+		       $content_model = '?contentModel',
+		       $state = '<fedora-model:Active>',
+		       $filters = array()) {
+
+    $label = $label == '?label' ? $label : '"' . $label . '"';
+
+    $query = "SELECT ?object
+     FROM <#ri>
+     WHERE {
+            ?object <fedora-model:label> " . $label . ";
+                    <fedora-model:hasModel> " . $content_model . ";
+                    <fedora-model:state> " . $state . " .";
+
+    /*
+      FILTER(sameTerm($collection_predicate, <fedora-rels-ext:isMemberOfCollection>) || sameTerm($collection_predicate, <fedora-rels-ext:isMemberOf>))
+      FILTER (!sameTerm($content, <info:fedora/fedora-system:FedoraObject-3.0>))";
+    */
+
+    $query .= "
+
+     }";
+
+    $objects = array();
+    foreach($this->connection->repository->ri->query($query, 'sparql') as $result) {
+
+      $objects[] = $this->get_object($result['object']['value']);
+    }
+
+    return $objects;
   }
 
+  }
 
 class IslandoraSolrIndex {
 

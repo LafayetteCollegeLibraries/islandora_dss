@@ -26,6 +26,7 @@ require_once dirname(__DIR__) . '/islandora_dss/includes/mdl_prints.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/newspaper.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/islandora_solr.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/yohe.drush.inc';
+require_once dirname(__DIR__) . '/islandora_dss/includes/alumni.drush.inc';
 
 function islandora_dss_drush_command() {
 
@@ -513,6 +514,18 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg2' => dt('the file path for the SVG image metadata'),
 			       ),
 	  'aliases' => array('yohe-in'));
+
+  /**
+   * Lafayette College Alumni Publication Tasks
+   *
+   */
+  $items['islandora-book-alumni-ingest-set'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt(''),
+			       ),
+	  'aliases' => array());
 
   /**
    * Geology Department Slide Collection tasks

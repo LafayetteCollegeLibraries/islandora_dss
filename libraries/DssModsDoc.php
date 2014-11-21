@@ -425,8 +425,8 @@ class AlumniModsDoc extends DssModsDoc {
     $gmt_date = new DateTime($norm_date, new DateTimeZone('America/New_York'));
     $gmt_date_solr = preg_replace('/\+00\:00/', 'Z', $gmt_date->format('c'));
 
-    $date = $part->addChild('date', $gmt_date_solr);
-    $date['encoding'] = 'w3cdtf';
+    $date_w3cdtf = $part->addChild('date', $gmt_date_solr);
+    $date_w3cdtf['encoding'] = 'w3cdtf';
     //$date['keyDate'] = 'yes'; //! This breaks validation (?)
 
     $date = $part->addChild('date', array_pop($values));
@@ -435,8 +435,19 @@ class AlumniModsDoc extends DssModsDoc {
     foreach(array_slice($values, 0, 2) as $i => $value) {
 
       //$detail = $part->addChild('detail', $value);
-      $text = $part->addChild('text', $value);
-      $detail = $part->addChild('detail');
+
+      if(!empty($value)) {
+
+	$text = $part->addChild('text', $value);
+	$text['type'] = $detail_type_map[$i % 2];
+      }
+
+      if(!empty($values[$i + 2])) {
+
+	$detail = $part->addChild('detail');
+	$detail['type'] = $detail_type_map[$i % 2];
+	$number = $detail->addChild('number', $values[$i + 2]);
+      }
 
       /*
       $node = dom_import_simplexml($detail);
@@ -447,21 +458,21 @@ class AlumniModsDoc extends DssModsDoc {
       $part = $this->doc->relatedItem->part;
       $detail = $part->detail[$i];
       */
-
-      $text['type'] = $detail_type_map[$i % 2];
-      $detail['type'] = $detail_type_map[$i % 2];
-
-      $number = $detail->addChild('number', $values[$i + 2]);
     }
 
-    /*
     for($j=1;$j < count($this->doc->relatedItem);$j++) {
 
+      /*
       $dom = dom_import_simplexml($this->doc->relatedItem[$j]);
       $partDom = dom_import_simplexml( simplexml_load_string($part->asXml()) );
       $dom->appendChild($dom->ownerDocument->importNode($partDom, TRUE));
+      */
+
+      $originInfo = $this->doc->relatedItem[$j]->addChild('originInfo');
+      $dateIssued = $originInfo->addChild('dateIssued', $gmt_date_solr);
+      $dateIssued['encoding'] = 'w3cdtf';
+      $dateIssued['keyDate'] = 'yes';
     }
-    */
   }
 
   function set_record($csv_row) {
