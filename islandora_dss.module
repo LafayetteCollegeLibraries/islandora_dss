@@ -909,6 +909,8 @@ function islandora_dss_generate_derivative_jpg_book($pid) {
   }
 }
 
+
+
 /**
  * Generate paths for Islandora Collection Objects
  *
@@ -1089,6 +1091,8 @@ function islandora_dss_book_page_ingest($file, $book_pid, $label = NULL, $page_p
 
   islandora_paged_content_update_datastream($object, drupal_realpath(property_exists($file, 'uri') ? $file->uri : $file ), 'OBJ', NULL, NULL, 'M', FALSE);
 
+  property_exists($file, 'uri');
+
   // Update RELS-EXT properties, page/sequence/etc, and append the page at the
   // end of the book.
   $rels_ext = $object->relationships;
@@ -1218,8 +1222,6 @@ FILTER regex(?title, "' . $title . '") .
  * @return bool
  *   TRUE if the user is allowed to access this object, FALSE otherwise.
  */
-
-dpm($_GET);
 
 function islandora_dss_object_datastream_access_callback($perm, $object = NULL, $datastream = NULL, $account = NULL) {
 
