@@ -674,6 +674,97 @@ class EastAsiaModsDoc extends DssModsDoc {
 					   'contributor',
 					   'relation.ispartof');
 
+  /*
+   *
+   */
+  public static $field_element_map = array(
+					   //'contributor' => array(),
+					   //'coverage.location' => array(),
+					   //'coverage.location.country' => array(),
+					   //'creator.company' => array(),
+					   'creator.digital' => array('name' => 'note',
+								      'attributes' => array('type' => 'creation credits')),
+					   //'creator.maker' => array(),
+					   //'date.artifact.lower' => array(),
+					   //'date.artifact.upper' => array(),
+					   //'date.image.lower' => array(),
+					   //'date.image.upper' => array(),
+					   //'date.original' => array(),
+					   //'date.search' => array(),
+					   'description.citation' => array('name' => 'note',
+									   'attributes' => array('type' => 'citation')),
+					   'description.critical' => array('name' => 'note',
+									   'attributes' => array('type' => 'content')),
+					   'description.ethnicity' => array('name' => 'note',
+									    'attributes' => array('type' => 'ethnicity')),
+					   'description.indicia' => array('name' => 'note',
+									  'attributes' => array('type' => 'indicia')),
+					   'description.inscription.english' => array('name' => 'note',
+										      'attributes' => array('type' => 'handwritten',
+													    'xml:lang' => 'en-US')),
+					   'description.inscription.japanese' => array('name' => 'note',
+										       'attributes' => array('type' => 'handwritten',
+													     'xml:lang' => 'Jpan')),
+					   'description.text.english' => array('name' => 'abstract',
+									       'attributes' => array('xml:lang' => 'en-US')),
+					   'description.text.japanese' => array('name' => 'abstract',
+										'attributes' => array('xml:lang' => 'Jpan')),
+					   'format.digital' => array('name' => 'note',
+								     'attributes' => array('type' => 'digital format')),
+					   //'format.extent' => array(),
+					   //'format.medium' => array(),
+					   'identifier.dmrecord' => array(),
+					   'publisher.digital' => array('name' => 'note',
+									'attributes' => array('type' => 'statement of responsibility')),
+					   'relation.ispartof' => array('name' => 'note',
+									'attributes' => array('type' => 'admin')),
+					   //'relation.seealso' => array(),
+					   'rights.digital' => array('name' => 'accessCondition',
+								     'attributes' => array()),
+					   //'subject.ocm' => array(),
+					   
+					   /*
+					   'description' => array('name' => 'abstract',
+								  'attributes' => array()),
+
+					   'description.note' => array('name' => 'note',
+								       'attributes' => array('type' => 'description')),
+					   'description.provenance' => array('name' => 'note',
+									     'attributes' => array('type' => 'ownership')),
+					   'description.series' => array('name' => 'note',
+									 'attributes' => array('type' => 'series')),
+					   'identifier.itemnumber' => array('name' => 'identifier',
+									    'attributes' => array('type' => 'item-number',
+												  'displayLabel' => 'Identifier.ItemNumber')),
+					   'identifier.oclc' => array('name' => 'identifier', // Unique to CONTENTdm
+								      'attributes' => array('type' => 'oclc',
+											    'displayLabel' => 'OCLC number')),
+					   'identifier.contentdm' => array('name' => 'identifier', // Unique to CONTENTdm
+									   'attributes' => array('type' => 'contentdm',
+												 'displayLabel' => 'CONTENTdm number',
+												 'invalid' => 'yes')), // http://cdm.lafayette.edu has reached the end of its service life
+					   'identifier.contentdm-file-name' => array('name' => 'identifier', // Unique to CONTENTdm
+										     'attributes' => array('type' => 'contentdm-file-name',
+													   'displayLabel' => 'CONTENTdm file name',
+													   'invalid' => 'yes')), // http://cdm.lafayette.edu has reached the end of its service life
+					   'identifier.contentdm-file-path' => array('name' => 'identifier', // Unique to CONTENTdm
+										     'attributes' => array('type' => 'contentdm-file-path',
+													   'displayLabel' => 'CONTENTdm file path',
+													   'invalid' => 'yes')), // http://cdm.lafayette.edu has reached the end of its service life
+					   'identifier.dmrecord' => array('name' => 'identifier', // Unique to MetaDB
+									  'attributes' => array('type' => 'content-dm',
+												'displayLabel' => 'CONTENTdm Digital Object Index')),
+					   'publisher.digital' => array('name' => 'note',
+									'attributes' => array('type' => 'statement of responsibility')),
+					   'format.digital' => array('name' => 'note',
+								     'attributes' => array('type' => 'digital format')),
+					   'rights.digital' => array('name' => 'accessCondition',
+								     'attributes' => array()),
+					   'relation.IsPartOf' => array('name' => 'note',
+									'attributes' => array('type' => 'admin'))
+					   */
+					   );
+
   function __construct($xmlstr = NULL,
 		       $project = NULL, $item = NULL,
 		       $record = NULL) {
@@ -736,6 +827,257 @@ class EastAsiaModsDoc extends DssModsDoc {
 
     return (string) $this->record;
   }
+
+  function map_field($field_name, $field_value) {
+
+    $trans = self::$field_element_map;
+
+    if(!array_key_exists($field_name, $trans)) {
+
+      throw new Exception("Unsupported field name: $field_name ($field_value)");
+    }
+    $map = $trans[$field_name];
+    $element = $this->doc->addChild($map['name'], $field_value);
+
+    foreach($map['attributes'] as $attr_name => $attr_value) {
+
+      $element->addAttribute($attr_name, $attr_value);
+    }
+  }
+
+  function add_title($field_value) {
+
+    $titleInfo = $this->doc->addChild('titleInfo');
+    return $titleInfo->addChild('title', $field_value);
+  }
+
+  function add_title_chinese($field_value) {
+
+    $title = $this->add_title($field_value);
+    $title->addAttribute('xml:lang', 'zh');
+  }
+
+  function add_title_english($field_value) {
+
+    $title = $this->add_title($field_value);
+    $title->addAttribute('xml:lang', 'en-US');
+  }
+
+  function add_title_japanese($field_value) {
+
+    $title = $this->add_title($field_value);
+    $title->addAttribute('xml:lang', 'Jpan');
+  }
+
+  function add_title_korean($field_value) {
+
+    $title = $this->add_title($field_value);
+    $title->addAttribute('xml:lang', 'Kore');
+  }
+
+  function add_subject_ocm($field_value) {
+
+    $subject_elem = $this->doc->addChild('subject');
+    $subject_elem->addAttribute('authorityURI', 'http://www.yale.edu/hraf/outline.htm');
+    $subject_elem->addChild('topic', $field_value);
+  }
+
+  function add_contributor($field_value) {
+    
+    $name = $this->doc->addChild('name');
+    $name->addChild('namePart', $field_value);
+
+    $role = $name->addChild('role');
+    $roleTerm = $role->addChild('roleTerm', 'ctb');
+    $roleTerm->addAttribute('authority', 'marcrelator');
+    $roleTerm->addAttribute('type', 'code');
+  }
+
+  function add_creator_company($field_value) {
+
+    $originInfo = $this->get_element('/mods:mods/mods:originInfo', 'originInfo');
+    $originInfo->addChild('publisher', $field_value);
+  }
+
+  function add_creator_maker($field_value) {
+
+    $name = $this->doc->addChild('name');
+    $name->addChild('namePart', $field_value);
+
+    $role = $name->addChild('role');
+    $roleTerm = $role->addChild('roleTerm', 'pht');
+    $roleTerm->addAttribute('authority', 'marcrelator');
+    $roleTerm->addAttribute('type', 'code');
+  }
+
+  function add_coverage_location_country($field_value) {
+
+    $subject = $this->doc->addChild('subject');
+    $geographic = $subject->addChild('hierarchicalGeographic');
+    $country = $geographic->addChild('country', $field_value);
+  }
+
+  function add_coverage_location($field_value) {
+
+    $subject = $this->doc->addChild('subject');
+    $geographic = $subject->addChild('geographic', $field_value);
+  }
+
+  function add_format_medium($field_value) {
+
+    $physicalDesc = $this->get_element('/mods:mods/mods:physicalDescription', 'physicalDescription');
+    $physicalDesc->addChild('form', $field_value);
+  }
+
+  function add_format_extent($field_value) {
+    
+    $physicalDesc = $this->get_element('/mods:mods/mods:physicalDescription', 'physicalDescription');
+    $physicalDesc->addChild('extent', $field_value);
+  }
+
+  function add_date($field_value) {
+
+    if(preg_match('/^\d{4}$/', $field_value)) {
+
+      $field_value += '-01-01';
+    } elseif(preg_match('/^\d{4}\-\d{2}$/', $field_value)) {
+
+      $field_value += '-01';
+    }
+
+    if(preg_match('/[A-Z]\w{2}\-\d{2}/', $field_value)) {
+
+      $field_value = preg_replace('/\-/', '-19',$field_value);
+    }
+
+    if($field_value == '1935-06-31') {
+
+      $field_value = '1935-06-30';
+    } elseif($field_value == '1935-04-31') {
+
+      $field_value = '1935-04-30';
+    }
+
+    $date = new DateTime($field_value, new DateTimeZone("GMT"));
+    $field_value = preg_replace('/\+00\:00/', 'Z', $date->format('c'));
+
+    return $field_value;
+  }
+
+  function add_date_original($field_value) {
+
+    //$field_value = add_date($field_value);
+    $field_value = $this->add_date($field_value);
+
+    $originInfo = $this->get_element('/mods:mods/mods:originInfo', 'originInfo');
+    $dateOther = $originInfo->addChild('dateOther', $field_value);
+    $dateOther->addAttribute('type', 'original');
+  }
+
+  function add_date_artifact_upper($field_value) {
+
+    //$field_value = add_date($field_value);
+    $field_value = $this->add_date($field_value);
+
+    $originInfo = $this->get_element('/mods:mods/mods:originInfo', 'originInfo');
+    $dateIssued = $originInfo->addChild('dateIssued', $field_value);
+    $dateIssued->addAttribute('point', 'end');
+    $dateIssued->addAttribute('encoding', 'iso8601');
+  }
+
+  function add_date_artifact_lower($field_value) {
+
+    //$field_value = add_date($field_value);
+    $field_value = $this->add_date($field_value);
+
+    $originInfo = $this->get_element('/mods:mods/mods:originInfo', 'originInfo');
+    $dateIssued = $originInfo->addChild('dateIssued', $field_value);
+    $dateIssued->addAttribute('point', 'start');
+    $dateIssued->addAttribute('encoding', 'iso8601');
+  }
+
+  function add_date_search($field_value) {
+
+    //$field_value = add_date($field_value);
+    $field_value = $this->add_date($field_value);
+
+    $originInfo = $this->get_element('/mods:mods/mods:originInfo', 'originInfo');
+    $dateOther = $originInfo->addChild('dateOther', $field_value);
+    $dateOther->addAttribute('type', 'search');
+    $dateOther->addAttribute('encoding', 'iso8601');
+  }
+
+  function add_date_image_upper($field_value) {
+
+    //$field_value = add_date($field_value);
+    $field_value = $this->add_date($field_value);
+
+    $originInfo = $this->get_element('/mods:mods/mods:originInfo', 'originInfo');
+    $dateCreated = $originInfo->addChild('dateCreated', $field_value);
+    $dateCreated->addAttribute('point', 'end');
+    $dateCreated->addAttribute('encoding', 'iso8601');
+  }
+
+  function add_date_image_lower($field_value) {
+
+    $field_value = $this->add_date($field_value);
+
+    $originInfo = $this->get_element('/mods:mods/mods:originInfo', 'originInfo');
+    $dateCreated = $originInfo->addChild('dateCreated', $field_value);
+    $dateCreated->addAttribute('point', 'start');
+    $dateCreated->addAttribute('encoding', 'iso8601');
+  }
+
+  function add_identifier_url_download($field_value) {
+
+    $location = $this->get_element('/mods:mods/mods:location', 'location');
+    $url = $location->addChild('url', $field_value);
+    $url->addAttribute('displayLabel', 'Download');
+  }
+
+  function add_identifier_url_zoom($field_value) {
+
+    $location = $this->get_element('/mods:mods/mods:location', 'location');
+    $url = $location->addChild('url', $field_value);
+    $url->addAttribute('displayLabel', 'Zoom');
+  }
+
+  function add_field($field_name, $field_value) {
+
+    // @todo Resolve this properly for certain encoding issues
+    //$field_value = htmlspecialchars($field_value);
+
+    $method_name = 'add_' . preg_replace('/\./', '_', $field_name);
+
+    if(in_array($field_name, self::$delimited_fields)) {
+
+      // For cases in which fields contain semicolon-delimited values
+
+      //foreach(preg_split('/;/', $field_value) as $delimited_value) {
+      foreach(explode(';', $field_value) as $delimited_value) {
+
+	$delimited_value = htmlspecialchars($delimited_value);
+	
+	if(method_exists($this, $method_name)) {
+
+	  call_user_func(array($this, $method_name), $delimited_value);
+	} else {
+
+	  $this->map_field($field_name, $delimited_value);
+	}
+      }
+    } else { // @todo Refactor
+
+      $field_value = htmlspecialchars($field_value);
+	if(method_exists($this, $method_name)) {
+
+	  return call_user_func(array($this, $method_name), $field_value);
+	} else {
+
+	  return $this->map_field($field_name, $field_value);
+	}
+    }
+  }
 }
 
 
@@ -785,27 +1127,6 @@ class MdlPrintsModsDoc extends DssModsDoc {
 					   'relation.IsPartOf' => array('name' => 'note',
 									'attributes' => array('type' => 'admin'))
 					   );
-
-/*
-  title
-description.note
-creator
-  subject.lcsh
-publisher.original
-date.original
-  format.medium
-format.extent
-description
-  description.condition
-description.provenance
-description.series
-  identifier.itemnumber
-publisher.digital
-format.digital
-  source
-rights.digital
-relation.IsPartOf
- */
 
   function map_field($field_name, $field_value) {
 

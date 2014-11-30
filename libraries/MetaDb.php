@@ -10,12 +10,19 @@
 
 class MetaDbModsFactory {
 
+  public static $METADB_PROJECT_NAMES = array('imperial-postcards' => 'east-asia');
+
   /**
    * Static method for generating the Class name from the MetaDB Project name
    * @param string $project_name
    * @returns string
    */
   private static function get_mods_class($project_name) {
+
+    if(array_key_exists($project_name, self::$METADB_PROJECT_NAMES)) {
+
+      $project_name = self::$METADB_PROJECT_NAMES[$project_name];
+    }
 
     return implode(array_map('ucfirst', explode('-', $project_name))) . 'ModsDoc';
   }

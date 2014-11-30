@@ -11,6 +11,23 @@ $module_path = drupal_get_path('module', 'islandora_dss');
 @include_once "$module_path/libraries/DssModsDoc.php";
 
 /**
+ * Migrate a MetaDB Item from the East Asia Image Collection into Islandora
+ *
+ */
+function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $item_id) {
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+
+  $factory = new MetaDbModsFactory('139.147.162.164');
+
+  $mods_doc = $factory->get_doc($project_name, $item_id);
+  $mods_doc->validate();
+
+  print (string) $mods_doc;
+  
+}
+
+/**
  * Export a MetaDB Items from the East Asia Image Collection into Islandora
  *
  */

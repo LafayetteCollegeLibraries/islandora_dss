@@ -458,11 +458,15 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
   $items['islandora-east-asia-mods-export'] =
     array(
 	  'description' => dt(''), //@todo Implement
-	  'aliases' => array(''));
+	  'aliases' => array());
   $items['islandora-east-asia-mods-export-collection'] =
     array(
 	  'description' => dt(''), //@todo Implement
-	  'aliases' => array(''));
+	  'aliases' => array());
+  $items['islandora-east-asia-mods-migrate'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
 
   /**
    * Marquis de Lafayette Prints Collection tasks
