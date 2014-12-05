@@ -347,12 +347,6 @@ class AlumniModsDoc extends DssModsDoc {
       }
     }
 
-    // Add the MARC relator for the role
-    $role = $name->addChild('role');
-    $roleTerm = $role->addChild('roleTerm', 'aut');
-    $roleTerm['type'] = 'code';
-    $roleTerm['authority'] = 'marcrelator';
-
     $name_children = $name->children();
 
     if(empty($name_children)) {
@@ -361,8 +355,13 @@ class AlumniModsDoc extends DssModsDoc {
     } else {
 
       $name['type'] = 'personal';
-    }
 
+      // Add the MARC relator for the role
+      $role = $name->addChild('role');
+      $roleTerm = $role->addChild('roleTerm', 'aut');
+      $roleTerm['type'] = 'code';
+      $roleTerm['authority'] = 'marcrelator';
+    }
   }
 
   // <originInfo and all child elements
@@ -375,7 +374,10 @@ class AlumniModsDoc extends DssModsDoc {
     //$placeTerm = $place->addChild('placeTerm', array_shift($values));
     //$publisher = $originInfo->addChild('publisher', array_shift($values));
 
-    $publisher = $originInfo->addChild('publisher', array_pop($values));
+    $publisher_value = array_pop($values);
+    $publisher_value = preg_replace('/Informaion/', 'Information', $publisher_value);
+
+    $publisher = $originInfo->addChild('publisher', $publisher_value);
 
     $place_term_uri_map = array('Easton, PA' => 'http://id.loc.gov/vocabulary/countries/pau');
     foreach($values as $value) {

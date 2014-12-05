@@ -44,7 +44,6 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
 	continue;
       }
 
-      /*
       $mods = new AlumniModsDoc($data);
 
       //print (string) $mods;
@@ -53,8 +52,8 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
       $dom->formatOutput = true;
       $dom->loadXML($mods->doc->asXML());
       echo $dom->saveXML();
-      */
-      print '.';
+
+      //print '.';
 
       $book_label = $data[0];
 
@@ -64,22 +63,22 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
       if(empty($books)) {
 
 	drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
-	//} else {
-      } elseif(false) {
+
+      } else {
 
 	$book = array_shift($books);
 
-	drush_log(dt('Appending the MODS Document to !pid', array('!pid' => $book->id)), 'ok');
-	//exit(1);
 	$ds = $book['MODS'];
+	$mods_content = (string) $mods;
 
 	if(empty($ds)) {
 
+	  drush_log(dt('Appending the MODS Document to !pid', array('!pid' => $book->id)), 'ok');
 	  $ds = $book->constructDatastream('MODS', 'X');
 	  $ds->label = 'MODS Document';
 	  $ds->mimeType = 'application/xml';
 
-	  $ds->setContentFromString((string) $mods);
+	  $ds->setContentFromString($mods_content);
 	  //$ds->setContentFromFile($file);
 	  try {
 
@@ -91,24 +90,27 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
 
 	  drush_log("Ingested the MODS Datastream for $book_pid", 'success');
 	} else {
+
+	  $ds_content_lines = explode("\n", $ds->content);
+	  $ds_content = implode("\n", array_slice($ds_content_lines, 2, -3));
+
+	  $dom = new DOMDocument("1.0");
+	  $dom->preserveWhiteSpace = false;
+	  $dom->formatOutput = true;
+	  $dom->loadXML($mods->doc->asXML());
+	  $_mods_content = $dom->saveXML();
+	  $mods_content_lines = explode("\n", $_mods_content);
+	  $_mods_content = implode("\n", array_slice($mods_content_lines, 2, -3));
+
+	  if($ds_content != $_mods_content) {
+
+	    drush_log(dt("Updating the MODS Datastream for !book_pid...", array('!book_pid' => $book->id)), 'ok');
 	  
-	  drush_log("Updating the MODS Datastream for $book_pid...", 'ok');
-	  
-	  $ds->setContentFromString((string) $mods_doc);
-	  drush_log("Updated the MODS Datastream for $book_pid", 'success');
+	    $ds->setContentFromString($mods_content);
+	    drush_log(dt("Updated the MODS Datastream for !book_pid", array('!book_pid' => $book->id)), 'success');
+	  }
 	}
       }
-
-      //print_r($books);
-      //exit(1);
-
-      /*
-      // Retrieve the related Object
-      preg_match('/(lafalummag_\d+[a-zA-Z]*)_\d+\.tif/', $i, $m);
-      $label = $m[0];
-      $book_label = $m[1];
-      */
-
     }
 
     fclose($csv_file);
@@ -116,10 +118,8 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
 }
 
 function drush_islandora_dss_islandora_book_alumni_append_pdf() {
-
-  }
-
-
+  
+}
 
 function drush_islandora_dss_islandora_book_alumni_ingest($file_name,
 							  $label,
@@ -150,7 +150,7 @@ function drush_islandora_dss_islandora_book_alumni_ingest($file_name,
   };
   $relationships = empty($collections) ? array() : array_map($relationship_map, $collections);
 
-  drush_log(t("Ingesting a new Book Object..."), 'ok');
+  drush_log(dt("Ingesting a new Book Object for !label...", array('!label' => $label)), 'ok');
   $newspaper = islandora_prepare_new_object($id, $label, array(), array('islandora:bookCModel'), $relationships);
   islandora_add_object($newspaper);
   drush_log(t("Ingested $file_name into the Book Object {$newspaper->id}"), 'success');
@@ -219,7 +219,7 @@ function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,
   //foreach(glob($tiff_dir_path . "/**/*.tif") as $tiff_file_path) {
   foreach($tiff_files as $i => $tiff_file_path) {
 
-    preg_match('/(lafalummag_\d+[a-zA-Z]*)_\d+\.tif/', $i, $m);
+    preg_match('/([a-z]+_\d+[a-zA-Z]*)_\d+\.tif/', $i, $m);
     $label = $m[0];
     $book_label = $m[1];
 
@@ -235,49 +235,103 @@ function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,
     // Retrieve the Book Object by its label
     $books = $session->get_objects($book_label);
 
-    //if(!array_key_exists($book_label, $ingested_books)) {
-    if(empty($books)) {
+    // Attempt to retrieve the PDF file
+    $pdf_files_iter = new RegexIterator($pdf_iter, '/' . $book_label . '\.pdf/i', RecursiveRegexIterator::GET_MATCH);
+    //$pdf_files = new RegexIterator($pdf_iter, '/^.+' . '\.pdf$/i', RecursiveRegexIterator::GET_MATCH);
 
-      drush_log(dt('Preparing to ingest the Book Object for the publication !book_label...', array('!book_label' => $book_label)), 'ok');
+    // Filter for the most recent datastream
+    $pdf_files = array();
+    foreach($pdf_files_iter as $j => $value) {
 
-      $pdf_files_iter = new RegexIterator($pdf_iter, '/' . $book_label . '\.pdf/i', RecursiveRegexIterator::GET_MATCH);
-      //$pdf_files = new RegexIterator($pdf_iter, '/^.+' . '\.pdf$/i', RecursiveRegexIterator::GET_MATCH);
+      if(!preg_match('/Preserved/', $j)) {
 
-      $pdf_files = array();
-      foreach($pdf_files_iter as $j => $value) {
+	if(preg_match('/Backstage/', $j)) {
 
-	$pdf_files[] = $j;
+	  //$pdf_files[count($pdf_files) - 1] = $j;
+	  $pdf_file_name = $j;
+	  break;
+	} else {
+
+	  //$pdf_files[] = $j;
+	  $pdf_file_name = $j;
+	}
       }
-
-      $pdf_file_name = $pdf_files[0];
-      $book = drush_islandora_dss_islandora_book_alumni_ingest($pdf_file_name,
-							       $book_label);
-
-      drush_log(dt('Successfully ingested the Book Object for the publication !book_label...', array('!book_label' => $book_label)), 'success');
-
-      $ingested_books[$book_label] = $book->id;
-    } else {
-
-      //$book = islandora_object_load($ingested_books[$book_label]);
-      $book = array_shift($books);
-
-
-      drush_log(dt('Retrieved the Book Object (!book_pid) for the publication !book_label...', array('!book_label' => $book_label,
-												     '!book_pid' => $book->id)), 'ok');
-
-      //print '.';
     }
 
+    //$pdf_file_name = $pdf_files[0];
+
+    if(!array_key_exists($book_label, $ingested_books)) {
+      if(empty($books)) {
+	
+	drush_log(dt('Preparing to ingest the Book Object for the publication !book_label...', array('!book_label' => $book_label)), 'ok');
+	
+	$book = drush_islandora_dss_islandora_book_alumni_ingest($pdf_file_name,
+								 $book_label);
+	
+	drush_log(dt('Successfully ingested the Book Object for the publication !book_label...', array('!book_label' => $book_label)), 'success');
+	
+	$ingested_books[$book_label] = $book->id;
+      } else {
+	
+	//$book = islandora_object_load($ingested_books[$book_label]);
+	$book = array_shift($books);
+	$ingested_books[$book_label] = $book->id;
+	
+	drush_log(dt('Retrieved the Book Object (!book_pid) for the publication !book_label...', array('!book_label' => $book_label,
+												       '!book_pid' => $book->id)), 'ok');
+	
+	// Determine if the OBJ Datastream matches that of the file
+	
+	$pdf_md5 = md5_file($pdf_file_name);
+	$ds_object = $book['OBJ'];
+	
+	drush_log(dt('Comparing the !pdf_file_name to the content of the OBJ Datastream !book_label...', array('!pdf_file_name' => $pdf_file_name)), 'ok');
+	
+	//if($ds_object->checksum != $pdf_md5) {
+	
+	$ds_object_checksum = md5($ds_object->content);
+	if($ds_object_checksum != $pdf_md5) {
+	  
+	  drush_log(dt('Updating the OBJ Datastream with !pdf_file_name...', array('!pdf_file_name' => $pdf_file_name)), 'ok');
+	  
+	  $ds_object->setContentFromFile($pdf_file_name);
+	  drush_log(dt('Updated the OBJ Datastream with !pdf_file_name', array('!pdf_file_name' => $pdf_file_name)), 'success');
+	} else {
+	  
+	  drush_log(dt('The OBJ Datastream contains !pdf_file_name', array('!pdf_file_name' => $pdf_file_name)), 'success');
+	}
+      }
+    }
+    
+    drush_log(dt('Retrieving the Page Object for !tiff_file_path...', array('!tiff_file_path' => $i)), 'ok');
+    
     // Retrieve the Page Object by its label
     $pages = $session->get_objects($i);
-
+    
     if(empty($pages)) {
-
+      
       drush_log(dt('Preparing to ingest the Page Object for the publication !i...', array('!i' => $i)), 'ok');
-
+      
       islandora_dss_book_page_ingest($i, $book->id);
 
       drush_log(dt('Successfully ingested the Page Object for the publication !i...', array('!i' => $i)), 'success');      
+    } else {
+
+      drush_log(dt('Retrieved the Page Object for !tiff_file_path', array('!tiff_file_path' => $i)), 'success');
+      $page = array_shift($pages);
+
+      if(!in_array($book->id, $page->getParents())) {
+
+	drush_log(dt('Invalid parent relationship for !page_id...', array('!page_id' => $page->id)), 'warning');
+	
+	drush_log(dt('Updating the parent relationship for !page_id...', array('!page_id' => $page->id)), 'okay');
+	$rels_ext = $page->relationships;
+	$book = islandora_object_load($ingested_books[$book_label]);
+
+	islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
+	islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
+	drush_log(dt('Updated the parent relationship for !page_id', array('!page_id' => $page->id)), 'success');
+      }
     }
   }
 }
