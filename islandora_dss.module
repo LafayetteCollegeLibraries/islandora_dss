@@ -743,6 +743,7 @@ function islandora_dss_update_islandora_paths($coll_pid, $solr_host = 'localhost
 	   $alias = 'collections/newspaper/' . implode(explode('-', $m[1]));
 	 } else {
 
+	   // Specialized handling for MetaDB-based collections
 	   $alias = islandora_dss_get_alias_metadb($member, $subcollection);
 	 }
 

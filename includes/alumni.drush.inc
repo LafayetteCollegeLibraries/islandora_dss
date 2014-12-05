@@ -6,6 +6,10 @@
    *
    */
 
+//require_once dirname(__DIR__) . '/libraries/Islandora.php';
+$module_path = drupal_get_path('module', 'islandora_dss');
+require_once "$module_path/libraries/Islandora.php";
+
 function drush_islandora_dss_islandora_book_alumni_append_mods($file) {
 
   /**
@@ -26,19 +30,85 @@ function drush_islandora_dss_islandora_book_alumni_append_mods($file) {
 
 function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_path) {
 
-  $row = 1;
+  // Get the connection
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $row = 0;
   if(($csv_file = fopen($csv_file_path, "r")) !== FALSE) {
 
     while(($data = fgetcsv($csv_file, 1000, ",")) !== FALSE) {
-      
-      $num = count($data);
-      echo "<p> $num fields in line $row: <br /></p>\n";
+
       $row++;
+      if($row == 1) {
 
-      for ($c=0; $c < $num; $c++) {
-
-	echo $data[$c] . "<br />\n";
+	continue;
       }
+
+      /*
+      $mods = new AlumniModsDoc($data);
+
+      //print (string) $mods;
+      $dom = new DOMDocument("1.0");
+      $dom->preserveWhiteSpace = false;
+      $dom->formatOutput = true;
+      $dom->loadXML($mods->doc->asXML());
+      echo $dom->saveXML();
+      */
+      print '.';
+
+      $book_label = $data[0];
+
+      $session = new IslandoraSession($connection);
+      $books = $session->get_objects($book_label);
+
+      if(empty($books)) {
+
+	drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
+	//} else {
+      } elseif(false) {
+
+	$book = array_shift($books);
+
+	drush_log(dt('Appending the MODS Document to !pid', array('!pid' => $book->id)), 'ok');
+	//exit(1);
+	$ds = $book['MODS'];
+
+	if(empty($ds)) {
+
+	  $ds = $book->constructDatastream('MODS', 'X');
+	  $ds->label = 'MODS Document';
+	  $ds->mimeType = 'application/xml';
+
+	  $ds->setContentFromString((string) $mods);
+	  //$ds->setContentFromFile($file);
+	  try {
+
+	    $book->ingestDatastream($ds);
+	  } catch (exception $e) {
+
+	    drupal_set_message(t('@message', array('@message' => check_plain($e->getMessage()))), 'error');
+	  }
+
+	  drush_log("Ingested the MODS Datastream for $book_pid", 'success');
+	} else {
+	  
+	  drush_log("Updating the MODS Datastream for $book_pid...", 'ok');
+	  
+	  $ds->setContentFromString((string) $mods_doc);
+	  drush_log("Updated the MODS Datastream for $book_pid", 'success');
+	}
+      }
+
+      //print_r($books);
+      //exit(1);
+
+      /*
+      // Retrieve the related Object
+      preg_match('/(lafalummag_\d+[a-zA-Z]*)_\d+\.tif/', $i, $m);
+      $label = $m[0];
+      $book_label = $m[1];
+      */
+
     }
 
     fclose($csv_file);
@@ -49,7 +119,7 @@ function drush_islandora_dss_islandora_book_alumni_append_pdf() {
 
   }
 
-require_once dirname(__DIR__) . '/libraries/Islandora.php';
+
 
 function drush_islandora_dss_islandora_book_alumni_ingest($file_name,
 							  $label,
@@ -191,7 +261,11 @@ function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,
       //$book = islandora_object_load($ingested_books[$book_label]);
       $book = array_shift($books);
 
-      drush_log(dt('Retrieved the Book Object for the publication !book_label...', array('!book_label' => $book_label)), 'ok');
+
+      drush_log(dt('Retrieved the Book Object (!book_pid) for the publication !book_label...', array('!book_label' => $book_label,
+												     '!book_pid' => $book->id)), 'ok');
+
+      //print '.';
     }
 
     // Retrieve the Page Object by its label

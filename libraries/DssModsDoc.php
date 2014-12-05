@@ -280,6 +280,8 @@ class AlumniModsDoc extends DssModsDoc {
 					       
 					       'Date of Publication' => array('xpath' => "./mods:subject/mods:geographic",
 									      'facet' => true),
+
+					       ''
 					       );
 
   function __construct($csv_row, $xmlstr = NULL) {
@@ -345,6 +347,12 @@ class AlumniModsDoc extends DssModsDoc {
       }
     }
 
+    // Add the MARC relator for the role
+    $role = $name->addChild('role');
+    $roleTerm = $role->addChild('roleTerm', 'aut');
+    $roleTerm['type'] = 'code';
+    $roleTerm['authority'] = 'marcrelator';
+
     $name_children = $name->children();
 
     if(empty($name_children)) {
@@ -354,6 +362,7 @@ class AlumniModsDoc extends DssModsDoc {
 
       $name['type'] = 'personal';
     }
+
   }
 
   // <originInfo and all child elements
@@ -385,6 +394,7 @@ class AlumniModsDoc extends DssModsDoc {
       if(!empty($value)) {
 
 	$relatedItem = $this->doc->addChild('relatedItem');
+	$relatedItem->addAttribute('type', 'host');
 	$titleInfo = $relatedItem->addChild('titleInfo');
 	$title = $titleInfo->addChild('title', $value);
       }
@@ -421,16 +431,22 @@ class AlumniModsDoc extends DssModsDoc {
 
     //$date_value = $date->addChild('date');
 
-    // Retrieve the datestamp within GMT
-    $gmt_date = new DateTime($norm_date, new DateTimeZone('America/New_York'));
+    // Retrieve the datestamp within UTC
+    //$gmt_date = new DateTime($norm_date, new DateTimeZone('America/New_York'));
+    //$local_date = new DateTime($norm_date, new DateTimeZone('America/New_York'));
+
+    // @todo Implement handling for the indexing and retrieval of datestamps
+    $gmt_date = new DateTime($norm_date, new DateTimeZone('UTC'));
     $gmt_date_solr = preg_replace('/\+00\:00/', 'Z', $gmt_date->format('c'));
 
     $date_w3cdtf = $part->addChild('date', $gmt_date_solr);
     $date_w3cdtf['encoding'] = 'w3cdtf';
     //$date['keyDate'] = 'yes'; //! This breaks validation (?)
 
-    $date = $part->addChild('date', array_pop($values));
-    $date['qualifier'] = 'approximate';
+    $approx_date_value = array_pop($values);
+
+    $approx_date = $part->addChild('date', $approx_date_value);
+    $approx_date['qualifier'] = 'approximate';
 
     foreach(array_slice($values, 0, 2) as $i => $value) {
 
@@ -460,6 +476,8 @@ class AlumniModsDoc extends DssModsDoc {
       */
     }
 
+    // Extend for handling cases in which there is only a single, secondary entity for <relatedItem>
+
     for($j=1;$j < count($this->doc->relatedItem);$j++) {
 
       /*
@@ -472,7 +490,18 @@ class AlumniModsDoc extends DssModsDoc {
       $dateIssued = $originInfo->addChild('dateIssued', $gmt_date_solr);
       $dateIssued['encoding'] = 'w3cdtf';
       $dateIssued['keyDate'] = 'yes';
+
+      $approx_dateIssued = $originInfo->addChild('dateIssued', $approx_date_value);
+      $approx_dateIssued['qualifier'] = 'approximate';
     }
+  }
+
+  function add_identifier($value) {
+
+    $identifier = $this->doc->addChild('identifier', $value);
+
+    $identifier->addAttribute('type', 'local');
+    $identifier->addAttribute('displayLabel', 'Locally generated sequencing index');
   }
 
   function set_record($csv_row) {
@@ -503,6 +532,8 @@ class AlumniModsDoc extends DssModsDoc {
 
     $note_values = array_slice($csv_row, 18, 1);
     $this->add_note($note_values);
+
+    $this->add_identifier($csv_row[21]);
 
     return $this->validate();
   }
@@ -701,14 +732,21 @@ class EastAsiaModsDoc extends DssModsDoc {
 									  'attributes' => array('type' => 'indicia')),
 					   'description.inscription.english' => array('name' => 'note',
 										      'attributes' => array('type' => 'handwritten',
-													    'xml:lang' => 'en-US')),
+													    'xml:lang' => array('value' => 'en-US',
+																'namespace' => 'http://www.w3.org/XML/1998/namespace'))),
 					   'description.inscription.japanese' => array('name' => 'note',
 										       'attributes' => array('type' => 'handwritten',
-													     'xml:lang' => 'Jpan')),
+													     'xml:lang' => array('value' => 'Jpan',
+																 'namespace' => 'http://www.w3.org/XML/1998/namespace'
+																 ))),
 					   'description.text.english' => array('name' => 'abstract',
-									       'attributes' => array('xml:lang' => 'en-US')),
+									       'attributes' => array('xml:lang' => array('value' => 'en-US',
+															 'namespace' => 'http://www.w3.org/XML/1998/namespace'
+															 ))),
 					   'description.text.japanese' => array('name' => 'abstract',
-										'attributes' => array('xml:lang' => 'Jpan')),
+										'attributes' => array('xml:lang' => array('value' => 'Jpan',
+															  'namespace' => 'http://www.w3.org/XML/1998/namespace'
+															  ))),
 					   'format.digital' => array('name' => 'note',
 								     'attributes' => array('type' => 'digital format')),
 					   //'format.extent' => array(),
@@ -765,6 +803,8 @@ class EastAsiaModsDoc extends DssModsDoc {
 					   */
 					   );
 
+  public $collection;
+
   function __construct($xmlstr = NULL,
 		       $project = NULL, $item = NULL,
 		       $record = NULL) {
@@ -773,7 +813,16 @@ class EastAsiaModsDoc extends DssModsDoc {
 		       $project, $item,
 		       $record);
 
+    $this->collection = $collection;
+
     $this->set_record();
+  }
+
+  public function set_collection($collection) {
+
+    $this->collection = $collection;
+    $note = $this->doc->addChild('note', $this->collection);
+    $note->addAttribute('type', 'admin');
   }
 
   public function set_record($date_format = 'Y-m-d') {
@@ -821,6 +870,7 @@ class EastAsiaModsDoc extends DssModsDoc {
 	$this->record->fields[$metadb_field] = new DssMetaDbAdminDescField($element, $label, $data);
       }
     }
+
   }
 
   public function to_csv() {
@@ -841,38 +891,45 @@ class EastAsiaModsDoc extends DssModsDoc {
 
     foreach($map['attributes'] as $attr_name => $attr_value) {
 
-      $element->addAttribute($attr_name, $attr_value);
+      if(is_array($attr_value)) {
+
+	$element->addAttribute($attr_name, $attr_value['value'], $attr_value['namespace']);
+      } else {
+
+	$element->addAttribute($attr_name, $attr_value);
+      }
     }
   }
 
   function add_title($field_value) {
 
-    $titleInfo = $this->doc->addChild('titleInfo');
+    //$titleInfo = $this->doc->addChild('titleInfo');
+    $titleInfo = $this->get_element('/mods:mods/mods:titleInfo', 'titleInfo');
     return $titleInfo->addChild('title', $field_value);
   }
 
   function add_title_chinese($field_value) {
 
     $title = $this->add_title($field_value);
-    $title->addAttribute('xml:lang', 'zh');
+    $title->addAttribute('xml:lang', 'zh', 'http://www.w3.org/XML/1998/namespace');
   }
 
   function add_title_english($field_value) {
 
     $title = $this->add_title($field_value);
-    $title->addAttribute('xml:lang', 'en-US');
+    $title->addAttribute('xml:lang', 'en-US', 'http://www.w3.org/XML/1998/namespace');
   }
 
   function add_title_japanese($field_value) {
 
     $title = $this->add_title($field_value);
-    $title->addAttribute('xml:lang', 'Jpan');
+    $title->addAttribute('xml:lang', 'Jpan', 'http://www.w3.org/XML/1998/namespace');
   }
 
   function add_title_korean($field_value) {
 
     $title = $this->add_title($field_value);
-    $title->addAttribute('xml:lang', 'Kore');
+    $title->addAttribute('xml:lang', 'Kore', 'http://www.w3.org/XML/1998/namespace');
   }
 
   function add_subject_ocm($field_value) {
@@ -925,6 +982,9 @@ class EastAsiaModsDoc extends DssModsDoc {
 
   function add_format_medium($field_value) {
 
+    // islandora:24215
+    // 'islandora:24105'
+
     $physicalDesc = $this->get_element('/mods:mods/mods:physicalDescription', 'physicalDescription');
     $physicalDesc->addChild('form', $field_value);
   }
@@ -939,10 +999,10 @@ class EastAsiaModsDoc extends DssModsDoc {
 
     if(preg_match('/^\d{4}$/', $field_value)) {
 
-      $field_value += '-01-01';
+      $field_value .= '-01-01';
     } elseif(preg_match('/^\d{4}\-\d{2}$/', $field_value)) {
 
-      $field_value += '-01';
+      $field_value .= '-01';
     }
 
     if(preg_match('/[A-Z]\w{2}\-\d{2}/', $field_value)) {
@@ -1042,7 +1102,20 @@ class EastAsiaModsDoc extends DssModsDoc {
     $url->addAttribute('displayLabel', 'Zoom');
   }
 
+  function add_relation_seealso($field_value) {
+
+    $relatedItem = $this->doc->addChild('relatedItem');
+    $relatedItem->addAttribute('displayLabel', 'See also');
+    $relatedItem->addAttribute('type', 'references');
+
+    $note = $relatedItem->addChild('note', $field_value);
+    $note->addAttribute('type', 'citation');
+  }
+
   function add_field($field_name, $field_value) {
+
+    //$field_value = ereg_replace("[:cntrl:]", "", $field_value);
+    //if(!empty($field_value)) {
 
     // @todo Resolve this properly for certain encoding issues
     //$field_value = htmlspecialchars($field_value);
@@ -1057,26 +1130,37 @@ class EastAsiaModsDoc extends DssModsDoc {
       foreach(explode(';', $field_value) as $delimited_value) {
 
 	$delimited_value = htmlspecialchars($delimited_value);
+
+	if(!empty($delimited_value)) {
+
+	  // Work-around for islandora:24215
+	  if($delimited_value == 'Trading Card') {
+
+	    $delimited_value = 'Trading card';
+	  }
 	
-	if(method_exists($this, $method_name)) {
+	  if(method_exists($this, $method_name)) {
 
-	  call_user_func(array($this, $method_name), $delimited_value);
-	} else {
+	    call_user_func(array($this, $method_name), $delimited_value);
+	  } else {
 
-	  $this->map_field($field_name, $delimited_value);
+	    $this->map_field($field_name, $delimited_value);
+	  }
 	}
       }
     } else { // @todo Refactor
 
       $field_value = htmlspecialchars($field_value);
-	if(method_exists($this, $method_name)) {
+      if(method_exists($this, $method_name)) {
 
-	  return call_user_func(array($this, $method_name), $field_value);
-	} else {
+	return call_user_func(array($this, $method_name), $field_value);
+      } else {
 
-	  return $this->map_field($field_name, $field_value);
-	}
+	return $this->map_field($field_name, $field_value);
+      }
     }
+    //}
+
   }
 }
 

@@ -467,6 +467,15 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
     array(
 	  'description' => dt(''), //@todo Implement
 	  'aliases' => array());
+  $items['islandora-east-asia-ingest'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
+
+  $items['islandora-east-asia-ingest-imperial-postcards-backs'] =
+    array(
+	  'description' => dt(''),
+	  'aliases' => array());
 
   /**
    * Marquis de Lafayette Prints Collection tasks
@@ -530,6 +539,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
    *
    */
   $items['islandora-book-alumni-ingest-set'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt(''),
+			       ),
+	  'aliases' => array());
+  $items['islandora-book-alumni-append-metadata'] =
     array(
 	  'description' => dt(''), //! @todo Implement
 	  'arguments' => array('arg1' => dt(''),
@@ -1363,30 +1379,10 @@ function drush_islandora_dss_islandora_eaic_purge_lin_postcards($collection = 'L
   return drush_islandora_dss_islandora_eaic_purge_last_pages($collection);
 }
 
+/*
 function drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, $coll_prefix) {
 
-  /*
-  $MIGRATED = array(
-		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0057b.tif',
-		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0186b.tif',
-		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0193b.tif',
-		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0401b.tif',
-		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0282b.tif',
-		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0402b.tif',
-		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0059b.tif',
-		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0344b.tif',
-		    '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split/lc-spcol-lewis-postcards-0029b.tif',
-		    );
-  */
-
   foreach(file_scan_directory($dir_path, '/\.jpg/') as $file) {
-
-    /*
-    if(in_array($file->uri, $MIGRATED)) {
-
-      continue;
-    }
-    */
 
     // Parse the 
     preg_match('/\-(\d{4})/', $file->uri, $m);
@@ -1412,10 +1408,11 @@ FILTER regex(?title, "' . $metadb_id . '") .
 
     drush_log("Ingesting {$file->uri} and appending it to $book_pid...", 'ok');
 
-    //exit(1);
+    exit(1);
     islandora_dss_book_page_ingest($file, $book_pid);
   }
 }
+*/
 
 function drush_islandora_dss_islandora_eaic_lewis_postcards_backs($dir_path = '/mnt/imago1/spcol/DSS-production/lewis-postcards-backs-split') {
 
