@@ -9,6 +9,78 @@ $module_path = drupal_get_path('module', 'islandora_dss');
 @include_once "$module_path/vendor/autoload.php";
 @include_once "$module_path/libraries/Islandora.php";
 
+function drush_islandora_dss_islandora_solr_update_collection($collection_pid,
+							      $fedoragsearch_pwd,
+							      $fedoragsearch_url = 'http://localhost:8080/fedoragsearch',
+							      $fedoragsearch_user = 'fgsAdmin') {
+  
+  $connection = islandora_get_tuque_connection(user_load(1));
+  $session = new IslandoraSession($connection,
+				  $fedoragsearch_user,
+				  $fedoragsearch_pwd,
+				  $fedoragsearch_url
+				  );
+  
+  /*
+  $collection = new IslandoraCollection($session, $collection_pid);
+  print_r($collection->members);
+
+  $members = $collection->members;
+
+  foreach($members as $member) {
+  */
+
+  $query = 'SELECT $object $title $content
+     FROM <#ri>
+     WHERE {
+            $object $collection_predicate <info:fedora/' . $collection_pid . '> ;
+                   <fedora-model:label> $title ;
+                   <fedora-model:hasModel> $content ;
+                   <fedora-model:state> <fedora-model:Active> .
+            FILTER(sameTerm($collection_predicate, <fedora-rels-ext:isMemberOfCollection>) || sameTerm($collection_predicate, <fedora-rels-ext:isMemberOf>))
+            FILTER (!sameTerm($content, <info:fedora/fedora-system:FedoraObject-3.0>))';
+
+    $query .= '} ORDER BY $title';
+    $query_array = array(
+			 'query' => $query,
+			 'type' => 'sparql',
+			 //'pid' => $obj_pid,
+			 // Seems as though this is ignored completely.
+			 'page_size' => $page_size,
+			 'page_number' => $page_number,
+			 );
+
+    foreach($connection->repository->ri->query($query_array['query'], $query_array['type']) as $result) {
+
+      $member_id = $result['object']['value'];
+
+      // Build the GET request
+      $params = array('operation' => 'updateIndex', 'action' => 'fromPid', 'value' => $member_id);
+      $url = $fedoragsearch_url . '/rest?' . http_build_query($params);
+      
+      // Initialize the cURL handler
+      $ch = curl_init();
+      curl_setopt($ch, CURLOPT_URL, $url);
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+      curl_setopt($ch, CURLOPT_USERPWD, "$fedoragsearch_user:$fedoragsearch_pwd");
+
+      // Transmit the request
+      $response = curl_exec($ch);
+    
+      // Handle all cURL errors
+      if(curl_errno($ch)) {
+
+	drush_log("Failed to update the Document for " . $member_id . ":" . curl_error($ch), 'error');
+      } else {
+	
+	drush_log("Updated the Document for " . $member_id, 'success');
+      }
+
+      curl_close($ch);
+    }
+}
+
 /**
  * For updating Solr Documents by collection
  * @param string $cdm_collection
@@ -16,11 +88,14 @@ $module_path = drupal_get_path('module', 'islandora_dss');
  * @param string $fedoragsearch_url
  * @param string $fedoragsearch_user
  */
-function drush_islandora_dss_islandora_solr_update_collection($cdm_collection, $fedoragsearch_pwd, $fedoragsearch_url = 'http://localhost:8080/fedoragsearch', $fedoragsearch_user = 'fgsAdmin') {
+function drush_islandora_dss_islandora_solr_update_set($cdm_collection,
+						       $fedoragsearch_pwd,
+						       $collection_field = 'fgs.isMemberOf',
+						       $fedoragsearch_url = 'http://localhost:8080/fedoragsearch', $fedoragsearch_user = 'fgsAdmin') {
 
   $result = FALSE;
   $tuque = islandora_get_tuque_connection(user_load(1));
-  $solr_results = islandora_dss_basic_collection_get_objects_solr($cdm_collection);
+  $solr_results = islandora_dss_basic_collection_get_objects_solr($cdm_collection, $collection_field);
 
   foreach($solr_results['response']['docs'] as $solr_doc) {
     
@@ -193,10 +268,13 @@ function drush_islandora_dss_islandora_solr_clean_dates($cdm_collection, $fedora
  */
 function drush_islandora_dss_islandora_solr_update_object($object_id, $user, $pass, $fedoragsearch_url = 'http://localhost:8080/fedoragsearch') {
 
+  drush_log("Indexing " . $object_id . "...", 'ok');
+
   $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  
   $index = new IslandoraSolrIndex($solr, $user, $pass, $fedoragsearch_url);
 
   $index->update($object_id);
+  drush_log("Indexed " . $object_id . "...", 'success');
 }
 
 /**

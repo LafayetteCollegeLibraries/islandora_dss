@@ -199,6 +199,10 @@ function drush_islandora_dss_islandora_book_alumni_ingest($file_name,
 function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,
 							      $pdf_dir_path) {
 
+  global $argv;
+  $fedoragsearch_url = array_pop($argv);
+  $fedoragsearch_pwd = array_pop($argv);
+
   //$start = is_null($start) ? 0 : intval($start);
   $connection = islandora_get_tuque_connection(user_load(1));
   $session = new IslandoraSession($connection);
@@ -222,6 +226,13 @@ function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,
     preg_match('/([a-z]+_\d+[a-zA-Z]*)_\d+\.tif/', $i, $m);
     $label = $m[0];
     $book_label = $m[1];
+
+    /*
+    if(preg_match('/lafalummag/', $book_label)) {
+
+      continue;
+    }
+    */
 
     //! @todo Terrible; Refactor
     /*
@@ -261,6 +272,7 @@ function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,
     //$pdf_file_name = $pdf_files[0];
 
     if(!array_key_exists($book_label, $ingested_books)) {
+
       if(empty($books)) {
 	
 	drush_log(dt('Preparing to ingest the Book Object for the publication !book_label...', array('!book_label' => $book_label)), 'ok');
@@ -276,12 +288,45 @@ function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,
 	//$book = islandora_object_load($ingested_books[$book_label]);
 	$book = array_shift($books);
 	$ingested_books[$book_label] = $book->id;
+
+	/*
+	$ds_mods = $book['MODS'];
+	print_r($ds_mods->content);
+	*/
 	
 	drush_log(dt('Retrieved the Book Object (!book_pid) for the publication !book_label...', array('!book_label' => $book_label,
 												       '!book_pid' => $book->id)), 'ok');
+
+	$member_id = $book->id;
+
+	$fedoragsearch_user = 'fgsAdmin';
+
+	// Build the GET request
+	$params = array('operation' => 'updateIndex', 'action' => 'fromPid', 'value' => $member_id);
+	$url = $fedoragsearch_url . '/rest?' . http_build_query($params);
+
+	// Initialize the cURL handler
+	$ch = curl_init();
+	curl_setopt($ch, CURLOPT_URL, $url);
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+	curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+	curl_setopt($ch, CURLOPT_USERPWD, "$fedoragsearch_user:$fedoragsearch_pwd");
+	
+	// Transmit the request
+	$response = curl_exec($ch);
+    
+	// Handle all cURL errors
+	if(curl_errno($ch)) {
+
+	  drush_log("Failed to update the Document for " . $member_id . ":" . curl_error($ch), 'error');
+	} else {
+	  
+	  drush_log("Updated the Document for " . $member_id, 'success');
+	}
+
+	curl_close($ch);
 	
 	// Determine if the OBJ Datastream matches that of the file
-	
 	$pdf_md5 = md5_file($pdf_file_name);
 	$ds_object = $book['OBJ'];
 	
@@ -302,6 +347,7 @@ function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,
 	}
       }
     }
+    //continue;
     
     drush_log(dt('Retrieving the Page Object for !tiff_file_path...', array('!tiff_file_path' => $i)), 'ok');
     

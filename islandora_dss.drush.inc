@@ -821,14 +821,14 @@ function drush_islandora_dss_generate_jpg_ds($object, $image_file_path, $image_f
  * @param string $collection the name of the collection
  * @returns array an array of Solr Documents serialized into the JSON
  */
-function islandora_dss_basic_collection_get_objects_solr($collection) {
+function islandora_dss_basic_collection_get_objects_solr($collection, $collection_field = 'cdm.Relation.IsPartOf') {
 
   $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  
 
   try {
 
-    $solr_query = "cdm.Relation.IsPartOf:\"$collection\"";
-    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf', 'sort' => 'dc.title asc'));
+    $solr_query = $collection_field . ":" . $collection;
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID ' . $collection_field, 'sort' => 'dc.title asc'));
   } catch (Exception $e) {
 
     drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');

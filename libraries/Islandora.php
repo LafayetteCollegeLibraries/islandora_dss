@@ -443,8 +443,6 @@ class IslandoraCollection extends IslandoraObject {
 			 'page_number' => $page_number,
 			 );
 
-
-
     foreach($this->session->connection->repository->ri->query($query_array['query'], $query_array['type']) as $result) {
 
       $content_model_pid = $result['content']['value'];
@@ -469,6 +467,10 @@ class IslandoraCollection extends IslandoraObject {
       case 'islandora:sp_large_image_cmodel':
 
 	$this->members[] = new IslandoraLargeImage($this->session, $result['object']['value']);
+	break;
+
+      case 'islandora:bookCModel':
+	$this->members[] = new IslandoraBook($this->session, $result['object']['value']);
 	break;
 
       default:

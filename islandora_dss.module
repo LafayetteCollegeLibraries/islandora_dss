@@ -1232,7 +1232,7 @@ function islandora_dss_object_datastream_access_callback($perm, $object = NULL, 
 
     // If this isn't the newspaper...
     /* @todo Refactor */
-    if( $_SERVER['REMOTE_ADDR'] != variable_get('islandora_dss_geoserver_host', '139.147.4.148') and !in_array('islandora:newspaper', $object->getParents())) {
+    if( $_SERVER['REMOTE_ADDR'] != variable_get('islandora_dss_geoserver_host', '139.147.4.148') and !in_array('islandora:newspaper', $object->getParents()) and !in_array('islandora:alumni', $object->getParents()) ) {
 
       // Authenticated
       return user_access('administer site configuration') && islandora_object_datastream_access_callback($perm, $object, $datastream, $account);

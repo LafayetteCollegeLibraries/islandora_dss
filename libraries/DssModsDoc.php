@@ -296,7 +296,7 @@ class AlumniModsDoc extends DssModsDoc {
 
     $this->set_record($csv_row);
   }
-  
+
   // <titleInfo> and all child elements
   function add_title($values) {
 
@@ -506,6 +506,13 @@ class AlumniModsDoc extends DssModsDoc {
     $identifier->addAttribute('displayLabel', 'Locally generated sequencing index');
   }
 
+  public function set_collection($collection) {
+
+    $this->collection = $collection;
+    $note = $this->doc->addChild('note', $this->collection);
+    $note->addAttribute('type', 'admin');
+  }
+
   function set_record($csv_row) {
 
     // Direct mapping
@@ -536,6 +543,7 @@ class AlumniModsDoc extends DssModsDoc {
     $this->add_note($note_values);
 
     $this->add_identifier($csv_row[21]);
+    $this->set_collection('Alumni Publications');
 
     return $this->validate();
   }

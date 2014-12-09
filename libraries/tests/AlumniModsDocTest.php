@@ -81,6 +81,15 @@ class AlumniModsDocTest extends PHPUnit_Framework_TestCase {
       $dom->formatOutput = true;
       $dom->loadXML($this->mods->doc->asXML());
       echo $dom->saveXML();
+
+      $this->record6 = array("lafalumnews_19691000",'',"Lafayette Alumnus News",'','','','','','','',"Easton, PA","Lafayette College, Office of Public Informaion","Lafayette Alumni News [newspaper]",'','',"",'','',"","October, 1969","1969-10-01",532);
+      $this->mods = new AlumniModsDoc($this->record6);
+
+      $dom = new DOMDocument("1.0");
+      $dom->preserveWhiteSpace = false;
+      $dom->formatOutput = true;
+      $dom->loadXML($this->mods->doc->asXML());
+      echo $dom->saveXML();
     }
 
     public function testCollection() {
@@ -90,7 +99,7 @@ class AlumniModsDocTest extends PHPUnit_Framework_TestCase {
       if(($csv_file = fopen($this->csv_file_path, "r")) !== FALSE) {
 
 	$row = 0;
-	while(($data = fgetcsv($csv_file, 1000, ",")) !== FALSE) {
+	while(!$this->only_second_periodical_parsed and ($data = fgetcsv($csv_file, 1000, ",")) !== FALSE) {
 
 	  $row++;
 	  if($row == 1) {
@@ -98,7 +107,7 @@ class AlumniModsDocTest extends PHPUnit_Framework_TestCase {
 	    continue;
 	  }
 	  
-	  if(empty($data[13]) and !empty($data[13])) {
+	  if(!empty($data[12]) and $data[12] !== 'Lafayette Magazine') {
 
 	    $this->mods = new AlumniModsDoc($data);
 	    
@@ -106,8 +115,6 @@ class AlumniModsDocTest extends PHPUnit_Framework_TestCase {
 	    $dom->preserveWhiteSpace = false;
 	    $dom->formatOutput = true;
 	    $dom->loadXML($this->mods->doc->asXML());
-	  
-	    echo $dom->saveXML();
 
 	    $this->only_second_periodical_parsed = TRUE;
 	  }
