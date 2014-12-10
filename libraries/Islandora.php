@@ -401,13 +401,13 @@ class IslandoraCollection extends IslandoraObject {
 
   public $members;
 
-  function __construct($session, $pid = NULL, $object = NULL) {
+  function __construct($session, $pid = NULL, $object = NULL, $children_class = NULL) {
     
     parent::__construct($session, $pid, $object);
-    $this->get_members();
+    $this->get_members($children_class);
   }
 
-  private function get_members() {
+  private function get_members($class = NULL) {
 
     // Get the connection
     //$connection = islandora_get_tuque_connection(user_load(1), $url);
@@ -456,30 +456,35 @@ class IslandoraCollection extends IslandoraObject {
 	// @todo Implement
       }
       */
+      if(!is_null($class)) {
 
-      switch($content_model_pid) {
+	$this->members[] = new $class($this->session, $result['object']['value']);
+      } else {
 
-      case 'islandora:collectionCModel':
+	switch($content_model_pid) {
 
-	$this->members[] = new IslandoraCollection($this->session, $result['object']['value']);
-	break;
+	case 'islandora:collectionCModel':
 
-      case 'islandora:sp_large_image_cmodel':
+	  $this->members[] = new IslandoraCollection($this->session, $result['object']['value']);
+	  break;
 
-	$this->members[] = new IslandoraLargeImage($this->session, $result['object']['value']);
-	break;
+	case 'islandora:sp_large_image_cmodel':
+	  
+	  $this->members[] = new IslandoraLargeImage($this->session, $result['object']['value']);
+	  break;
+	  
+	case 'islandora:bookCModel':
+	  $this->members[] = new IslandoraBook($this->session, $result['object']['value']);
+	  break;
 
-      case 'islandora:bookCModel':
-	$this->members[] = new IslandoraBook($this->session, $result['object']['value']);
-	break;
-
-      default:
-	// @todo Implement
-	break;
+	default:
+	  // @todo Implement
+	  break;
+	}
       }
     }
   }
-  }
+}
 
 abstract class IslandoraImageObject extends IslandoraObject {
 

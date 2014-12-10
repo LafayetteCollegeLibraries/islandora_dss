@@ -214,6 +214,21 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 	  'description' => dt('Derive thumbnails for any given Islandora Book Object'),
 	  'aliases' => array('book-derive-tn'));
 
+  $items['islandora-book-derive-tn-pdf'] =
+    array(
+	  'description' => dt('Derive thumbnails for any given Islandora Book Object'),
+	  'aliases' => array());
+
+  $items['islandora-book-derive-tn-pdf-collection'] =
+    array(
+	  'description' => dt('Derive thumbnails for any given Islandora Book Object'),
+	  'aliases' => array());
+
+  $items['islandora-book-derive-tn-collection'] =
+    array(
+	  'description' => dt('Derive thumbnails for all Islandora Book Objects within a Collection'),
+	  'aliases' => array());
+
   $items['islandora-book-ingest-tn'] =
     array(
 	  'description' => dt('Ingest thumbnails for any given Islandora Book Object'),
@@ -1279,7 +1294,8 @@ function drush_islandora_dss_islandora_collection_generate_paths($collection_nam
 		  'Historical Photograph Collection',
 		  'Lafayette World War II Casualties',
 		  'Marquis de Lafayette Prints Collection',
-		  'McKelvy House Photograph Collection') as $collection_name) {
+		  'McKelvy House Photograph Collection',
+		  'Alumni Publications') as $collection_name) {
 
       islandora_dss_generate_islandora_paths($collection_name, $solr_host);
     }

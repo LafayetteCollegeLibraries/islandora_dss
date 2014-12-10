@@ -643,10 +643,25 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
       $member = islandora_object_load($solr_doc['PID']);
 
       /**
+       * Handling for members of the Alumni Publications Collection
+       *
+       */
+      if($subcollection == 'Alumni Publications') {
+      
+	if(!preg_match('/_(\d+)[A-Z]?$/', $member->label, $m)) {
+
+	  drush_log(dt("Cannot generate the path for !member_label", array('!member_label' => $member->label)), 'warning');
+	  continue;
+	} else {
+
+	  $alias = 'collections/alumni/' . $m[1];
+	}
+
+      /**
        * Specialized handling for the newspaper aliases
        *
        */
-      if($subcollection == 'Lafayette Newspaper Collection') {
+      } elseif($subcollection == 'Lafayette Newspaper Collection') {
 
 	$alias = $solr_doc['dc.date.sort'];
 	preg_match('/(\d{4}-\d{2}-\d{2})/', $alias, $m);

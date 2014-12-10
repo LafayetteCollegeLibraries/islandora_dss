@@ -10,6 +10,100 @@ $module_path = drupal_get_path('module', 'islandora_dss');
 @include_once "$module_path/vendor/autoload.php";
 @include_once "$module_path/libraries/Islandora.php";
 
+function drush_islandora_dss_islandora_book_derive_tn_pdf($book_pid) {
+
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+  $tuque = islandora_get_tuque_connection(user_load(1));
+
+  $book = islandora_object_load($book_pid);
+
+  /**
+   * Retrieve the PDF
+   *
+   */
+  drush_log(dt("Retrieving the Document in the PDF for the Book Object !book_pid...", array('!book_pid' => $book_pid)), 'ok');
+  $mime_detector = new MimeDetect();
+  $ext = $mime_detector->getExtension($book['OBJ']->mimeType);
+
+  // Retrieve the base name from the Object PID
+  $base_name = str_replace(':', '_', $book->id);
+
+  $filename = file_create_filename("{$base_name}_OBJ.{$ext}", 'temporary://');
+  $book['OBJ']->getContent($filename);
+
+  drush_log(dt("Deriving the thumbnail for the Book Object !book_pid...", array('!book_pid' => $book_pid)), 'ok');
+
+  $width=200;
+  $height=200;
+
+  // Generate the thumbnail from the first page of the PDF
+  $source = drupal_realpath($filename) . '[0]';
+  $matches = array();
+
+  $temp = drupal_tempnam("temporary://", "{$base_name}_islandora_book_tn");
+  $dest = drupal_realpath($temp) . 'jpg';
+  $args['quality'] = '-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75));
+  $args['previewsize'] = '-resize ' . escapeshellarg("{$width}x{$height}");
+  $args['colors'] = '-colorspace RGB';
+  $context = array(
+    'source' => $source,
+    'destination' => $dest,
+  );
+  drupal_alter('imagemagick_arguments', $args, $context);
+  // To make use of ImageMagick 6's parenthetical command grouping we need to make
+  // the $source image the first parameter and $dest the last.
+  // See http://www.imagemagick.org/Usage/basics/#cmdline
+  $command = escapeshellarg($source) . ' ' . implode(' ', $args) . ' ' . escapeshellarg("jpg:$dest");
+  $output = '';
+  $ret = -1;
+
+  if (_imagemagick_convert_exec($command, $output, $ret) !== TRUE) {
+
+    drush_log(dt("Failed to derive the thumbnail for the Book Object !book_pid", array('!book_pid' => $book_pid, '!ret' => $ret, '!output' => $output)), 'error');
+  } else {
+
+    drush_log(dt("Derived the thumbnail for the Book Object !book_pid", array('!book_pid' => $book_pid)), 'success');
+  }
+
+  /*
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+  islandora_large_image_add_datastream($book, 'TN', $dest, 'image/jpeg', t('Thumbnail'));
+  */
+
+  /*
+  $ds = $book->constructDatastream('TN', 'M');
+  $ds->label = 'Thumbnail';
+  $ds->mimeType = 'image/jpeg';
+  $ds->setContentFromFile($dest);
+  try {
+
+    $book->ingestDatastream($ds);
+  } catch (exception $e) {
+
+    drush_log(dt("Failed to ingest the thumbnail for the Book Object !book_pid", array('!book_pid' => $book_pid)), 'error');
+    //drupal_set_message(t('@message', array('@message' => check_plain($e->getMessage()))), 'error');
+    //return FALSE;
+  }
+  */
+  $ds = $book['TN'];
+  $ds->setContentFromFile($dest);
+
+  file_unmanaged_delete($dest);
+  file_unmanaged_delete($filename);
+}
+
+function drush_islandora_dss_islandora_book_derive_tn_pdf_collection($collection_pid) {
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $session = new IslandoraSession($tuque);
+  $collection = new IslandoraCollection($session, $collection_pid, NULL, 'IslandoraObject');
+  
+  foreach($collection->members as $member) {
+
+    drush_islandora_dss_islandora_book_derive_tn_pdf($member->id);
+  }
+}
+
 function drush_islandora_dss_islandora_book_derive_tn($book_pid) {
 
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
@@ -17,7 +111,25 @@ function drush_islandora_dss_islandora_book_derive_tn($book_pid) {
 
   $book = islandora_object_load($book_pid);
 
-  islandora_paged_content_page_derive_image_datastreams($book);
+  if(!$book['TN']) {
+
+    drush_log(dt("Deriving the thumbnail for the Book Object !book_pid...", array('!book_pid' => $book_pid)), 'ok');
+    islandora_paged_content_page_derive_image_datastreams($book);
+
+    drush_log(dt("Derived the thumbnail for the Book Object !book_pid", array('!book_pid' => $book_pid)), 'success');
+  }
+}
+
+function drush_islandora_dss_islandora_book_derive_tn_collection($collection_pid) {
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $session = new IslandoraSession($tuque);
+  $collection = new IslandoraCollection($session, $collection_pid, NULL, 'IslandoraObject');
+  
+  foreach($collection->members as $member) {
+
+    drush_islandora_dss_islandora_book_derive_tn($member->id);
+  }
 }
 
 function drush_islandora_dss_islandora_book_ingest_tn($book_pid, $derivative_file) {
