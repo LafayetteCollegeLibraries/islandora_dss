@@ -567,6 +567,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg2' => dt(''),
 			       ),
 	  'aliases' => array());
+  $items['islandora-book-alumni-append-label'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt(''),
+			       ),
+	  'aliases' => array());
 
   /**
    * Geology Department Slide Collection tasks
@@ -843,7 +850,8 @@ function islandora_dss_basic_collection_get_objects_solr($collection, $collectio
   try {
 
     $solr_query = $collection_field . ":" . $collection;
-    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID ' . $collection_field, 'sort' => 'dc.title asc'));
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID MODS.mods.relatedItem.titleInfo.title_s ' . $collection_field, 'sort' => 'dc.title asc'));
+    //$results = $solr->search($solr_query, 0, 1000000, array('sort' => 'dc.title asc'));
   } catch (Exception $e) {
 
     drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');

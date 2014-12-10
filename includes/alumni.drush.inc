@@ -117,8 +117,28 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
   }
 }
 
-function drush_islandora_dss_islandora_book_alumni_append_pdf() {
+function drush_islandora_dss_islandora_book_alumni_append_label($collection_field = 'Alumni Publications',
+								$cdm_collection = 'cdm.Relation.IsPartOf') {
   
+  $result = FALSE;
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $solr_results = islandora_dss_basic_collection_get_objects_solr('"' . $collection_field . '"', $cdm_collection);
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    $titles = $solr_doc['MODS.mods.relatedItem.titleInfo.title_s'];
+    $book = islandora_object_load($solr_doc['PID']);
+
+    if(!empty($titles)) {
+
+      $title = array_shift($titles);
+      $book->label = $title;
+      drush_log(dt("Updated the label for !book_label (!book_pid)", array('!book_label' => $book->label, '!book_pid' => $book->id)), 'success');
+    } else {
+
+      drush_log(dt("Could not retrieve the label for !book_pid", array('!book_pid' => $book->id)), 'error');
+    }
+  }
 }
 
 function drush_islandora_dss_islandora_book_alumni_ingest($file_name,
