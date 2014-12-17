@@ -28,7 +28,7 @@ function drush_islandora_dss_islandora_book_alumni_append_mods($file) {
   
 }
 
-function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_path) {
+function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_file_path, $file = NULL) {
 
   // Get the connection
   $connection = islandora_get_tuque_connection(user_load(1));
@@ -44,32 +44,156 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
 	continue;
       }
 
+      if(!is_null($file) and $file != $data[0]) {
+
+	continue;
+      }
+
+      $book_label = $data[0];
+      $session = new IslandoraSession($connection, 'http://localhost:8080/solr/fedora_5');
+      $books = $session->get_objects($book_label);
+
+      if($book_label == 'lafalummag_19660900X') {
+
+	$book = islandora_object_load('alumni:784');
+	$books = array($book);
+      }
+
+      if(empty($books)) {
+
+	// Attempt to query Solr for the Object
+	//$solr_results = $session->index->search('MODS.mods.relatedItem.part.date.approximate_s:"' . $data[19] . '"');
+	$solr_results = $session->index->search('MODS.mods.identifier.local_i:"' . $data[21] . '"');
+	$solr_response = $solr_results['response'];
+
+	if(empty($solr_response['docs'])) {
+
+	  drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
+	  exit(1);
+	} else {
+
+	  if(count($solr_response['docs']) > 1) {
+
+	    drush_log(dt('Duplicate Objects found bearing the label !label', array('!label' => $book_label)), 'warning');
+	  }
+
+	  //$docs = $solr_response['docs'];
+	  $doc = array_shift($solr_response['docs']);
+	  //$doc['PID'];
+	  $book = islandora_object_load($doc['PID']);
+	  $books = array($book);
+	}
+      }
+
+      $book = array_shift($books);
+
+      if(!preg_match('/_(\d+[A-Z]?)/', $book_label, $book_label_m)) {
+
+	print $book_label;
+	exit(1);
+      }
+
+      path_delete(array('source' => 'collections/alumni/' . $book_label_m[1]));
+
+      $alias_segment = str_replace('_', '-', $book_label);
+      $source = 'islandora/object/' . $book->id;
+      $alias = 'collections/alumninewspubs/' . $alias_segment;
+      $path = array('source' => $source,
+		    'alias' => $alias);
+
+      path_save($path);
+      drush_log(dt('Successfully generate the path alias !alias for !source', array('!alias' => $alias, '!source' => $source)), 'success');
+    }
+  }
+
+  $source = 'islandora/search/*:*?f[0]=cdm.Relation.IsPartOf:"Alumni Publications"';
+  $alias = 'collections/alumninewspubs/browse';
+  $path = array('source' => $source,
+		'alias' => $alias);
+  path_save($path);
+  drush_log(dt('Successfully generate the path alias !alias for !source', array('!alias' => $alias, '!source' => $source)), 'success');
+
+}
+
+function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_path,
+								   //$file = NULL,
+								   $fedoragsearch_pwd = NULL,
+								   $fedoragsearch_url = NULL,
+								   $file = NULL) {
+
+  // Get the connection
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $row = 0;
+  if(($csv_file = fopen($csv_file_path, "r")) !== FALSE) {
+
+    while(($data = fgetcsv($csv_file, 1000, ",")) !== FALSE) {
+
+      $row++;
+      if($row == 1) {
+
+	continue;
+      }
+
+      if(!is_null($file) and $file != $data[0]) {
+
+	continue;
+      }
+      
       $mods = new AlumniModsDoc($data);
 
-      //print (string) $mods;
       $dom = new DOMDocument("1.0");
       $dom->preserveWhiteSpace = false;
       $dom->formatOutput = true;
       $dom->loadXML($mods->doc->asXML());
       echo $dom->saveXML();
 
-      //print '.';
-
       $book_label = $data[0];
 
-      $session = new IslandoraSession($connection);
-      $books = $session->get_objects($book_label);
+      $session = new IslandoraSession($connection, 'http://localhost:8080/solr/fedora_5');
+
+      if($book_label == 'lafalummag_19660900X') {
+
+	$book = islandora_object_load('alumni:784');
+	$books = array($book);
+      } else {
+
+	$books = $session->get_objects($book_label);
+      }
+
+      if(empty($books)) {
+
+	// Attempt to query Solr for the Object
+	$solr_results = $session->index->search('MODS.mods.relatedItem.part.date.approximate_s:"' . $data[19] . '"');
+	$solr_response = $solr_results['response'];
+
+	if(empty($solr_response['docs'])) {
+
+	  drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
+	} elseif(count($solr_response['docs']) > 1) {
+
+	  drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
+	} else {
+
+	  //$docs = $solr_response['docs'];
+	  $doc = array_shift($solr_response['docs']);
+	  //$doc['PID'];
+	  $book = islandora_object_load($doc['PID']);
+	  $books = array($book);
+	}
+      }
 
       if(empty($books)) {
 
 	drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
-
+	exit(1);
       } else {
 
 	$book = array_shift($books);
 
 	$ds = $book['MODS'];
 	$mods_content = (string) $mods;
+
 
 	if(empty($ds)) {
 
@@ -90,7 +214,7 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
 
 	  drush_log("Ingested the MODS Datastream for $book_pid", 'success');
 	} else {
-
+	  
 	  $ds_content_lines = explode("\n", $ds->content);
 	  $ds_content = implode("\n", array_slice($ds_content_lines, 2, -3));
 
@@ -111,6 +235,36 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
 	  }
 	}
       }
+
+      $fedoragsearch_user = 'fgsAdmin';
+
+      // Build the GET request
+      $params = array('operation' => 'updateIndex', 'action' => 'fromPid', 'value' => $book->id);
+      $url = $fedoragsearch_url . '/rest?' . http_build_query($params);
+
+      //print $url;
+      //exit(1);
+
+      // Initialize the cURL handler
+      $ch = curl_init();
+      curl_setopt($ch, CURLOPT_URL, $url);
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_ANY);
+      curl_setopt($ch, CURLOPT_USERPWD, "$fedoragsearch_user:$fedoragsearch_pwd");
+	
+      // Transmit the request
+      $response = curl_exec($ch);
+
+      // Handle all cURL errors
+      if(curl_errno($ch)) {
+
+	drush_log("Failed to update the Document for " . $book->id . ":" . curl_error($ch), 'error');
+      } else {
+	  
+	drush_log("Updated the Document for " . $book->id, 'success');
+      }
+
+      curl_close($ch);
     }
 
     fclose($csv_file);
@@ -126,18 +280,36 @@ function drush_islandora_dss_islandora_book_alumni_append_label($collection_fiel
 
   foreach($solr_results['response']['docs'] as $solr_doc) {
 
-    $titles = $solr_doc['MODS.mods.relatedItem.titleInfo.title_s'];
-    $book = islandora_object_load($solr_doc['PID']);
+    $titles = $solr_doc['MODS.mods.titleInfo_s'];
+    $title = array_shift($titles);
+    $title = ltrim($title, ' ');
 
-    if(!empty($titles)) {
+    $volumes = $solr_doc['MODS.mods.relatedItem.part.text.volume_s'];
+    $issues = $solr_doc['MODS.mods.relatedItem.part.text.issue_s'];
+    $dates = $solr_doc['MODS.mods.relatedItem.part.date.approximate_s'];
 
-      $title = array_shift($titles);
-      $book->label = $title;
-      drush_log(dt("Updated the label for !book_label (!book_pid)", array('!book_label' => $book->label, '!book_pid' => $book->id)), 'success');
+    $label = $title;
+
+    if(!empty($volumes)) {
+
+      $volume = array_shift($volumes);
+      $label .= " (vol. $volume)";
+      if(!empty($issues)) {
+
+	$issue = array_shift($issues);
+	$label = rtrim($label, ')');
+	$label .= ", no. $issue)";
+      }
     } else {
 
-      drush_log(dt("Could not retrieve the label for !book_pid", array('!book_pid' => $book->id)), 'error');
+      $date = array_shift($dates);
+      $label .= " ($date)";
     }
+
+    $book = islandora_object_load($solr_doc['PID']);
+
+    $book->label = $label;
+    drush_log(dt("Updated the label for !book_label (!book_pid)", array('!book_label' => $book->label, '!book_pid' => $book->id)), 'success');
   }
 }
 

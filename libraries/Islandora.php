@@ -13,19 +13,33 @@ class IslandoraSession {
   private $islandora_load_callback;
 
   function __construct($connection,
+		       $solr_url = 'http://localhost:8080/solr/fedora',
 		       $fgs_user = 'fgsAdmin',
 		       $fgs_pass = NULL,
 		       $fgs_url = 'http://localhost:8080/fedoragsearch',
-		       $solr_url = 'http://localhost:8080/solr/fedora',
 		       $islandora_load_callback = 'islandora_object_load') {
 
     $this->connection = $connection;
 
+    /*
     if(!is_null($fgs_pass)) {
 
       $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora' . '/');
       $this->index = new IslandoraSolrIndex($solr, $fgs_user, $fgs_pass, $fgs_url);
     }
+    */
+    preg_match('/https?\:\/\/(.+?)\/(.+)/', $solr_url, $solr_host_m);
+    
+    $solr_host_fqdn = $solr_host_m[1];
+    $fqdn_segments = explode(':', $solr_host_fqdn);
+    $solr_host_port = count($fqdn_segments) == 1 ? 80 : (int) array_pop($fqdn_segments);
+    $solr_host_fqdn = array_shift($fqdn_segments);
+    
+    $solr_host_path = $solr_host_m[2];
+    $solr_host_path = rtrim($solr_host_path, '/') . '/';
+
+    $solr = new Apache_Solr_Service($solr_host_fqdn, $solr_host_port, $solr_host_path);
+    $this->index = new IslandoraSolrIndex($solr, $fgs_user, $fgs_pass, $fgs_url);
 
     $this->islandora_load_callback = $islandora_load_callback;
   }

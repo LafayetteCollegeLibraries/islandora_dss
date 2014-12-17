@@ -553,6 +553,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
    * Lafayette College Alumni Publication Tasks
    *
    */
+  $items['islandora-book-alumni-ingest'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt(''),
+			       ),
+	  'aliases' => array());
   $items['islandora-book-alumni-ingest-set'] =
     array(
 	  'description' => dt(''), //! @todo Implement
@@ -568,6 +575,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       ),
 	  'aliases' => array());
   $items['islandora-book-alumni-append-label'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt(''),
+			       ),
+	  'aliases' => array());
+  $items['islandora-book-alumni-generate-path-aliases'] =
     array(
 	  'description' => dt(''), //! @todo Implement
 	  'arguments' => array('arg1' => dt(''),
@@ -850,7 +864,7 @@ function islandora_dss_basic_collection_get_objects_solr($collection, $collectio
   try {
 
     $solr_query = $collection_field . ":" . $collection;
-    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID MODS.mods.relatedItem.titleInfo.title_s ' . $collection_field, 'sort' => 'dc.title asc'));
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID MODS.mods.titleInfo_s MODS.mods.relatedItem.part.text.volume_s MODS.mods.relatedItem.part.text.issue_s MODS.mods.relatedItem.part.date.approximate_s ' . $collection_field, 'sort' => 'dc.title asc'));
     //$results = $solr->search($solr_query, 0, 1000000, array('sort' => 'dc.title asc'));
   } catch (Exception $e) {
 
