@@ -6,29 +6,14 @@
    *
    */
 
-//require_once dirname(__DIR__) . '/libraries/Islandora.php';
 $module_path = drupal_get_path('module', 'islandora_dss');
 require_once "$module_path/libraries/Islandora.php";
 
-function drush_islandora_dss_islandora_book_alumni_append_mods($file) {
-
-  /**
-   * Document structure implemented by millerp
-   *
-   * "File","TitleInfoNonSort","TitleInfoTitle","TitleInfoSubtitle","TitleInfoPartNumber",
-   * "Name_AuthorityURI","NamePart_DisplayForm_PersonalAuthor","NamePart_Family_PersonalAuthor","NamePart_Given_PersonalAut
-   * hor","NamePart_Date_PersonalAuthor",
-   * "OriginInfoPlaceTerm","OriginInfoPublisher",
-   * "RelatedItemHost_1_TitleInfoTitle","RelatedItemHost_2_TitleInfoTitle",
-   * "PartDetailTypeVolume","PartDetailTypeIssue","PartDetailTypeVolumeNumber","PartDetailTypeIssueNumber","Note","PartDate_NaturalLanguage","PartDate_ISO8601"
-   *
-   */
-  
-  
-  
-}
-
-function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_file_path, $solr_url = 'http://crete0.stage.lafayette.edu:8080/solr/fedora_5', $file = NULL) {
+/**
+ *
+ *
+ */
+function drush_islandora_dss_islandora_book_alumni_purge_path_aliases($csv_file_path, $solr_url = 'http://localhost:8080/solr/fedora', $file = NULL) {
 
   // Get the connection
   $connection = islandora_get_tuque_connection(user_load(1));
@@ -62,7 +47,6 @@ function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_fi
       if(empty($books)) {
 
 	// Attempt to query Solr for the Object
-	//$solr_results = $session->index->search('MODS.mods.relatedItem.part.date.approximate_s:"' . $data[19] . '"');
 	$solr_results = $session->index->search('MODS.mods.identifier.local_i:"' . $data[21] . '"');
 	$solr_response = $solr_results['response'];
 
@@ -93,7 +77,90 @@ function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_fi
 	exit(1);
       }
 
-      path_delete(array('source' => 'collections/alumninewspubs/' . $book_label_m[1]));
+      $alumni_alias = 'collections/alumni/' . $book_label_m[1];
+      path_delete(array('alias' => $alumni_alias));
+      drush_log(dt('Successfully deleted the path alias !alias', array('!alias' => $alumni_alias)), 'success');
+
+      $alumni_news_pubs_alias = 'collections/alumninewspubs/' . $book_label_m[1];
+      path_delete(array('alias' => $alumni_news_pubs_alias));
+      drush_log(dt('Successfully deleted the path alias !alias', array('!alias' => $alumni_news_pubs_alias)), 'success');
+    }
+  }
+
+  $alumni_alias = 'collections/alumni/browse';
+  path_delete(array('alias' => $alumni_alias));
+  drush_log(dt('Successfully deleted the path alias !alias', array('!alias' => $alumni_alias)), 'success');
+
+  $alumni_news_pubs_alias = 'collections/alumninewspubs/browse';
+  path_delete(array('alias' => $alumni_news_pubs_alias));
+  drush_log(dt('Successfully deleted the path alias !alias', array('!alias' => $alumni_news_pubs_alias)), 'success');
+}
+
+/**
+ *
+ *
+ */
+function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_file_path, $solr_url = 'http://localhost:8080/solr/fedora', $file = NULL) {
+
+  // Get the connection
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $row = 0;
+  if(($csv_file = fopen($csv_file_path, "r")) !== FALSE) {
+
+    while(($data = fgetcsv($csv_file, 1000, ",")) !== FALSE) {
+
+      $row++;
+      if($row == 1) {
+
+	continue;
+      }
+
+      if(!is_null($file) and $file != $data[0]) {
+
+	continue;
+      }
+
+      $book_label = $data[0];
+      $session = new IslandoraSession($connection, $solr_url);
+      $books = $session->get_objects($book_label);
+
+      if($book_label == 'lafalummag_19660900X') {
+
+	$book = islandora_object_load('alumni:784');
+	$books = array($book);
+      }
+
+      if(empty($books)) {
+
+	// Attempt to query Solr for the Object
+	$solr_results = $session->index->search('MODS.mods.identifier.local_i:"' . $data[21] . '"');
+	$solr_response = $solr_results['response'];
+
+	if(empty($solr_response['docs'])) {
+
+	  drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
+	  exit(1);
+	} else {
+
+	  if(count($solr_response['docs']) > 1) {
+
+	    drush_log(dt('Duplicate Objects found bearing the label !label', array('!label' => $book_label)), 'warning');
+	  }
+
+	  $doc = array_shift($solr_response['docs']);
+	  $book = islandora_object_load($doc['PID']);
+	  $books = array($book);
+	}
+      }
+
+      $book = array_shift($books);
+
+      if(!preg_match('/_(\d+[A-Z]?)/', $book_label, $book_label_m)) {
+
+	print $book_label;
+	exit(1);
+      }
 
       $alias_segment = str_replace('_', '-', $book_label);
       $source = 'islandora/object/' . $book->id;
@@ -106,15 +173,12 @@ function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_fi
     }
   }
 
-  /*
-  $source = 'islandora/search/*:*?f[0]=cdm.Relation.IsPartOf:"Alumni Publications"';
-  $alias = 'collections/alumninewspubs/browse';
+  $source = 'islandora/search/*:*?f[0]=cdm.Relation.IsPartOf:"Lafayette Magazine Collection"';
+  $alias = 'collections/magazine/browse';
   $path = array('source' => $source,
 		'alias' => $alias);
   path_save($path);
   drush_log(dt('Successfully generate the path alias !alias for !source', array('!alias' => $alias, '!source' => $source)), 'success');
-  */
-
 }
 
 function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_path,

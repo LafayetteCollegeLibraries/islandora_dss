@@ -588,6 +588,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg2' => dt(''),
 			       ),
 	  'aliases' => array());
+  $items['islandora-book-alumni-purge-path-aliases'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt(''),
+			       ),
+	  'aliases' => array());
 
   /**
    * Geology Department Slide Collection tasks
