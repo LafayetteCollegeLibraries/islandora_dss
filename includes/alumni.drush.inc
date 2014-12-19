@@ -93,11 +93,11 @@ function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_fi
 	exit(1);
       }
 
-      path_delete(array('source' => 'collections/alumni/' . $book_label_m[1]));
+      path_delete(array('source' => 'collections/alumninewspubs/' . $book_label_m[1]));
 
       $alias_segment = str_replace('_', '-', $book_label);
       $source = 'islandora/object/' . $book->id;
-      $alias = 'collections/alumninewspubs/' . $alias_segment;
+      $alias = 'collections/magazine/' . $alias_segment;
       $path = array('source' => $source,
 		    'alias' => $alias);
 
@@ -106,12 +106,14 @@ function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_fi
     }
   }
 
+  /*
   $source = 'islandora/search/*:*?f[0]=cdm.Relation.IsPartOf:"Alumni Publications"';
   $alias = 'collections/alumninewspubs/browse';
   $path = array('source' => $source,
 		'alias' => $alias);
   path_save($path);
   drush_log(dt('Successfully generate the path alias !alias for !source', array('!alias' => $alias, '!source' => $source)), 'success');
+  */
 
 }
 
@@ -186,7 +188,7 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
       if(empty($books)) {
 
 	drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
-	exit(1);
+	//exit(1);
       } else {
 
 	$book = array_shift($books);
