@@ -543,7 +543,7 @@ class AlumniModsDoc extends DssModsDoc {
     $this->add_note($note_values);
 
     $this->add_identifier($csv_row[21]);
-    $this->set_collection('Alumni Publications');
+    $this->set_collection('Lafayette Magazine Collection');
 
     return $this->validate();
   }
