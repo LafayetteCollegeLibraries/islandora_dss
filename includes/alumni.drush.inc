@@ -28,7 +28,7 @@ function drush_islandora_dss_islandora_book_alumni_append_mods($file) {
   
 }
 
-function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_file_path, $file = NULL) {
+function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_file_path, $solr_url = 'http://crete0.stage.lafayette.edu:8080/solr/fedora_5', $file = NULL) {
 
   // Get the connection
   $connection = islandora_get_tuque_connection(user_load(1));
@@ -50,7 +50,7 @@ function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_fi
       }
 
       $book_label = $data[0];
-      $session = new IslandoraSession($connection, 'http://localhost:8080/solr/fedora_5');
+      $session = new IslandoraSession($connection, $solr_url);
       $books = $session->get_objects($book_label);
 
       if($book_label == 'lafalummag_19660900X') {
