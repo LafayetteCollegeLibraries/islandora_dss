@@ -28,7 +28,7 @@ function drush_islandora_dss_islandora_book_alumni_append_mods($file) {
   
 }
 
-function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_file_path, $solr_url = 'http://localhost:8080/solr/fedora_5', $file = NULL) {
+function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_file_path, $solr_url = 'http://crete0.stage.lafayette.edu:8080/solr/fedora_5', $file = NULL) {
 
   // Get the connection
   $connection = islandora_get_tuque_connection(user_load(1));
