@@ -10,6 +10,73 @@ $module_path = drupal_get_path('module', 'islandora_dss');
 @include_once "$module_path/vendor/autoload.php";
 @include_once "$module_path/libraries/Islandora.php";
 
+// 	  $page[$ds_label]->label = $normalized_label;
+//$items['islandora-book-datastream-labels'] =
+
+function drush_islandora_dss_islandora_book_datastream_labels($collection_pid) {
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $session = new IslandoraSession($tuque);
+  $collection = new IslandoraCollection($session, $collection_pid, NULL, 'IslandoraObject');
+  
+  foreach($collection->members as $member) {
+
+    $member = islandora_object_load($member->id);
+    //$obj_ds = $member->datastream('OBJ');
+    $obj_ds = $member['OBJ'];
+
+    if(!is_null($obj_ds)) {
+
+      drush_log(dt('Generating the label for the OBJ Datastream appended to !object_id', array('!object_id' => $member->id)), 'ok');
+
+      $object_path_alias = drupal_get_path_alias("islandora/object/{$member->id}");
+      $alias_segments = explode('/', $object_path_alias);
+      $term_alias_segments = array_pop($alias_segments);
+
+      $obj_ds_label = preg_replace('/\-/', '_', $term_alias_segments);
+      $obj_ds->label = $obj_ds_label;
+
+      drush_log(dt('Successfully generated the label !obj_ds_label for the OBJ Datastream appended to !object_id', array('!obj_ds_label' => $obj_ds_label,
+															 '!object_id' => $member->id)), 'success');
+
+    } else {
+
+      drush_log(dt('!object_id does not have an OBJ Datastream appended', array('!object_id' => $member->id)), 'warning');
+    }
+  }
+}
+
+function drush_islandora_dss_islandora_book_generate_alias_pdf($collection_pid) {
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  $session = new IslandoraSession($tuque);
+  $collection = new IslandoraCollection($session, $collection_pid, NULL, 'IslandoraObject');
+  
+  foreach($collection->members as $member) {
+
+    $obj_ds = $member->datastream('OBJ');
+
+    if(!is_null($obj_ds)) {
+
+      $object_path_alias = drupal_get_path_alias("islandora/object/{$member->id}");
+
+      // Generate the path alias for the OBJ datastream
+      $path = array('source' => "islandora/object/{$member->id}/datastream/OBJ/download",
+		    'alias' => "$object_path_alias/pdf");
+
+      drush_log(dt('Generating the path for the OBJ Datastream appended to !object_id', array('!object_id' => $member->id)), 'ok');
+
+      path_delete($path);    
+      path_save($path);
+      
+      drush_log(dt('Successfully generated the path for the OBJ Datastream appended to !object_id', array('!object_id' => $member->id)), 'success');
+    } else {
+
+      drush_log(dt('!object_id does not have an OBJ Datastream appended', array('!object_id' => $member->id)), 'warning');
+    }
+  }
+}
+
 function drush_islandora_dss_islandora_book_derive_tn_pdf($book_pid) {
 
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');

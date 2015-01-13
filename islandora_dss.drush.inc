@@ -209,6 +209,16 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
    */
   //module_load_include('drush.inc', 'islandora_dss', 'includes/islandora_book');
 
+  $items['islandora-book-generate-alias-pdf'] =
+    array(
+	  'description' => dt(''),
+	  'aliases' => array());
+
+  $items['islandora-book-datastream-labels'] =
+    array(
+	  'description' => dt('Properly set the Datastream labels for MODS, OBJ, and TN Islandora Book Object Datastreams'),
+	  'aliases' => array());
+
   $items['islandora-book-derive-tn'] =
     array(
 	  'description' => dt('Derive thumbnails for any given Islandora Book Object'),
