@@ -134,13 +134,16 @@ function drush_islandora_dss_islandora_book_alumni_generate_path_aliases($csv_fi
       if(empty($books)) {
 
 	// Attempt to query Solr for the Object
+	drush_log(dt('Searching for Object !sequence_number within the sequence', array('!sequence_number' => $data[21])), 'ok');
+
 	$solr_results = $session->index->search('MODS.mods.identifier.local_i:"' . $data[21] . '"');
+	//$solr_results = $session->index->search('MODS.mods.identifier.local_i:"' . $data[21] . '" AND cdm.Relation.IsPartOf:"Alumni Publications"');
 	$solr_response = $solr_results['response'];
 
 	if(empty($solr_response['docs'])) {
 
 	  drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
-	  exit(1);
+	  //exit(1);
 	} else {
 
 	  if(count($solr_response['docs']) > 1) {
@@ -230,7 +233,11 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
       if(empty($books)) {
 
 	// Attempt to query Solr for the Object
-	$solr_results = $session->index->search('MODS.mods.relatedItem.part.date.approximate_s:"' . $data[19] . '"');
+	drush_log(dt('Searching for Object !sequence_number within the sequence', array('!sequence_number' => $data[21])), 'ok');
+	//$solr_results = $session->index->search('MODS.mods.relatedItem.part.date.approximate_s:"' . $data[19] . '"');
+	$solr_results = $session->index->search('MODS.mods.identifier.local_i:"' . $data[21] . '"');
+	//$solr_results = $session->index->search('MODS.mods.identifier.local_i:"' . $data[21] . '" AND cdm.Relation.IsPartOf:"Alumni Publications"');
+
 	$solr_response = $solr_results['response'];
 
 	if(empty($solr_response['docs'])) {
@@ -252,7 +259,9 @@ function drush_islandora_dss_islandora_book_alumni_append_metadata($csv_file_pat
       if(empty($books)) {
 
 	drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
+
 	//exit(1);
+	continue;
       } else {
 
 	$book = array_shift($books);
@@ -452,6 +461,61 @@ function drush_islandora_dss_islandora_book_alumni_ingest($file_name,
   drush_log(t("Generated the thumbnail for {$newspaper->id}"), 'success');
 
   return $newspaper;
+}
+
+/**
+ * Drush task for updating the OBJ Datastream content with Documents in the PDF of a lower resolution
+ * Resolves DSSSM-1146
+ *
+ */
+function drush_islandora_dss_islandora_book_alumni_ingest_pdf($pdf_dir_path = '/mnt/smb/dss/dss-production/Lafayette_AlumniPubs_13-117_final_delivery/PDFs_Consolidated/reduced_150ppi') {
+
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $pdf_dir = new RecursiveDirectoryIterator($pdf_dir_path);
+  $pdf_iter = new RecursiveIteratorIterator($pdf_dir);
+
+  // Attempt to retrieve the PDF file
+  //$pdf_files_iter = new RegexIterator($pdf_iter, '/' . $book_label . '\.pdf/i', RecursiveRegexIterator::GET_MATCH);
+  $pdf_files_iter = new RegexIterator($pdf_iter, '/' . '\.pdf/i', RecursiveRegexIterator::GET_MATCH);
+
+  // Filter for the most recent datastream
+  $pdf_files = array();
+  foreach($pdf_files_iter as $file_path => $value) {
+
+    //print $file_path . "\n";
+
+    # lafalummag_19401000.pdf
+    preg_match('/\/([0-9a-zA-Z_]+)\.pdf$/', $file_path, $m);
+    $path_alias_segment = $m[1];
+    $path_alias_segment = preg_replace('/_/', '-', $path_alias_segment);
+    
+    // https://digital.stage.lafayette.edu/collections/magazine/lafalummag-19380200
+    $path_alias = "collections/magazine/" . $path_alias_segment;
+
+    //print $path_alias . "\n";
+
+    $path = drupal_get_normal_path($path_alias);
+    //print $path . "\n";
+
+    // preg_match('/\/([az]+\:\d+)$/', $path, $pid_match);
+    preg_match('/([a-z]+\:\d+)$/', $path, $pid_match);
+    $pid = $pid_match[1];
+
+    //print $pid . "\n";
+
+    $book = islandora_object_load($pid);
+    drush_log(dt('Ingesting the PDF !pdf_file into the OBJ Datastream for !obj_pid...', array('!pdf_file' => $file_path,
+											      '!obj_pid' => $book->id)), 'ok');
+
+    // Retrieve the Islandora Object
+    $ds_obj = $book['OBJ'];
+    $ds_obj->setContentFromFile($file_path);
+    drush_log(dt('Ingested the PDF !pdf_file into the OBJ Datastream for !obj_pid...', array('!pdf_file' => $file_path,
+											     '!obj_pid' => $book->id)), 'success');
+
+    
+  }
 }
 
 function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,

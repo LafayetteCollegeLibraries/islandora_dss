@@ -9,7 +9,10 @@
  * Ingesting Yohe Album derivatives
  *
  */
-function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/DSS-production/yohe_albums/TIFF', $svg_file_path = 'YoheSVGareaSelectors.csv') {
+function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/DSS-production/yohe_albums/TIFF',
+						   $svg_file_path = 'YoheSVGareaSelectors.csv') {
+
+  $dir_path = rtrim($dir_path, '/') . '/';
 
   if(($svg_file_path = fopen($svg_file_path, "r")) !== FALSE) {
 
@@ -58,7 +61,6 @@ function drush_islandora_dss_islandora_yohe_ingest($dir_path = '/mnt/smb/spcol/D
 
       if(!array_key_exists($label, $ingested_books)) {
 
-	//drush_log('Ingesting the Book Object for the physical Yohe Album ' . $m[0] . '...', 'ok');
 	drush_log('Ingesting the Book Object for the physical Yohe Album ' . $label . '...', 'ok');
 
 	$namespace = 'yohe';

@@ -366,6 +366,10 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
 
+  $items['islandora-metadb-metadata-export'] =
+    array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
+	  'aliases' => array());
+
   /**
    * Islandora/Drupal Path Alias management tasks
    *
@@ -577,6 +581,14 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg2' => dt(''),
 			       ),
 	  'aliases' => array());
+
+  $items['islandora-book-alumni-ingest-pdf'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array('arg1' => dt(''),
+			       ),
+	  'aliases' => array());
+
   $items['islandora-book-alumni-append-metadata'] =
     array(
 	  'description' => dt(''), //! @todo Implement
@@ -1787,20 +1799,18 @@ function drush_islandora_dss_islandora_collection_replace_placeholder_derivative
 
 function drush_islandora_dss_islandora_collection_generate_derivatives_jpg($collection = NULL) {
 
-  /*
-Ingesting /mnt/imago1/master/MetaDB/pa-omitsu01/lc-spcol-pa-omitsu01-0001.tif into the OBJ datastream for for islandora:32731...           [ok]
-PHP Fatal error:  Allowed memory size of 268435456 bytes exhausted (tried to allocate 86379688 bytes) in /usr/share/drupal/ldr/sites/all/modules/islandora/libraries/tuque/HttpConnection.php on line 411
-   */
-
   $EASTASIA_RELATION_MAP = array(
 				 //'East Asia Image Collection' => 'eastasia',
+
+				 'Japanese Imperial House Postcard Album' => 'eastasia/imperial-postcards',
+
 				 //'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
 				 //'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
 				 //'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
 
 				 // Create issue for this task
-				 //'Sino-Japanese War Postcard Album 01' => 'eastasia/pa-omitsu01',
-				 //'Sino-Japanese War Postcard Album 02' => 'eastasia/pa-omitsu02',
+				 'Sino-Japanese War Postcard Album 01' => 'eastasia/pa-omitsu01',
+				 'Sino-Japanese War Postcard Album 02' => 'eastasia/pa-omitsu02',
 
 				 'Lin Chia-Feng Family Postcard Collection' => 'eastasia/lin-postcards',
 				 'Japanese History Study Cards' => 'eastasia/japan-study-cards',
@@ -1860,6 +1870,9 @@ PHP Fatal error:  Allowed memory size of 268435456 bytes exhausted (tried to all
     foreach($solr_results['response']['docs'] as $solr_doc) {
 
       $subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
+
+      //drush_log( dt('Generating branded derivatives for members of !collection', array('!collection' => $subcollection)), 'ok' );
+
       if(array_key_exists($subcollection, $EASTASIA_RELATION_MAP)) {
 
 	islandora_dss_generate_derivative_jpg_book($solr_doc['PID']);

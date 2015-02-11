@@ -157,13 +157,6 @@ function islandora_dss_update_index($object_pid, $fedoragsearch_url, $fedoragsea
     curl_close($ch);
 }
 
-/*
-function drush_islandora_dss_islandora_solr_update_object($object_pid, $fedoragsearch_url, $fedoragsearch_user, $fedoragsearch_pwd) {
-
-  return islandora_dss_update_index($object_pid, $fedoragsearch_url, $fedoragsearch_user, $fedoragsearch_pwd);
-}
-*/
-
 /**
  * Cleaning dates for Objects within a given collection
  *
@@ -266,11 +259,14 @@ function drush_islandora_dss_islandora_solr_clean_dates($cdm_collection, $fedora
  * @param string $fedoragsearch_url
  * @param string $fedoragsearch_user
  */
-function drush_islandora_dss_islandora_solr_update_object($object_id, $user, $pass, $fedoragsearch_url = 'http://localhost:8080/fedoragsearch') {
+function drush_islandora_dss_islandora_solr_update_object($object_id, $user, $pass,
+							  $fedoragsearch_url = 'http://localhost:8080/fedoragsearch',
+							  $solr_host = 'localhost',
+							  $solr_core_context = 'solr/fedora') {
 
   drush_log("Indexing " . $object_id . "...", 'ok');
 
-  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  
+  $solr = new Apache_Solr_Service($solr_host, 8080, $solr_core_context . '/');
   $index = new IslandoraSolrIndex($solr, $user, $pass, $fedoragsearch_url);
 
   $index->update($object_id);
@@ -286,7 +282,7 @@ function drush_islandora_dss_islandora_solr_update_object($object_id, $user, $pa
  */
 function drush_islandora_dss_islandora_solr_delete_object($object_id, $user, $pass, $fedoragsearch_url = 'http://localhost:8080/fedoragsearch') {
 
-  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  
+  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora' . '/');  
   $index = new IslandoraSolrIndex($solr, $user, $pass, $fedoragsearch_url);
 
   $index->delete($object_id);

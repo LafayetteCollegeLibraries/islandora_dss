@@ -218,9 +218,15 @@ function drush_islandora_dss_islandora_book_ingest_tn($book_pid, $derivative_fil
   //$file = fopen($derivative_file, "r");
   $file = $derivative_file;
 
-  $ds = $object->constructDatastream($dsid, 'M');
-  $ds->label = $label;
-  $ds->mimeType = $mimetype;
+  $ds = $object['TN'];
+
+  if(!$ds) {
+
+    $ds = $object->constructDatastream($dsid, 'M');
+    $ds->label = $label;
+    $ds->mimeType = $mimetype;
+  }
+
   $ds->setContentFromFile($file);
   try {
     $object->ingestDatastream($ds);
