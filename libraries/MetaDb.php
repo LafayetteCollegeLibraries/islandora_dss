@@ -117,7 +117,12 @@ class MetaDbModsFactory {
       //$item_csv_fields[$field_name] = $data;
     }
 
-    return $item_csv_fields;
+    //return $item_csv_fields;
+
+    $item_csv_record = array_merge(array($project_name,
+					 $item_id), $item_csv_fields);
+
+    return $item_csv_record;
   }
 
   function get_doc($project_name,

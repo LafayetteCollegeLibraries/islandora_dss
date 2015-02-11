@@ -205,12 +205,14 @@ function drush_islandora_dss_islandora_metadb_metadata_export($metadb_collection
   $solr = new Apache_Solr_Service($solr_host, 8080, $solr_path . '/');  
   $index = new IslandoraSolrIndex($solr);
   $solr_query = "cdm.Relation.IsPartOf:\"$metadb_collection_name\"";
-  $solr_results = $index->search($solr_query, array('fl' => 'PID dc.identifier'));
+  $solr_results = $index->search($solr_query, array('fl' => 'PID', 'sort' => 'dc.title asc'));
 
-  $item_csv_columns = array();
+  $item_csv_columns = array('project_name', 'item_number');
 
+  $i = 0;
   foreach($solr_results['response']['docs'] as $solr_doc) {
 
+    //if($i > 10) { break; }
     /*
      *
      */
@@ -221,10 +223,16 @@ function drush_islandora_dss_islandora_metadb_metadata_export($metadb_collection
 
     $metadb_item_number = (int) $metadb_id_match[1];
 
-    $item_csv_rows[] = $mods_factory->get_csv_row($metadb_project_name, $metadb_item_number, $item_csv_columns);
+    $item_record = $mods_factory->get_csv_row($metadb_project_name, $metadb_item_number, $item_csv_columns);
+    $item_csv_rows[] = $item_record;
+
+    $i++;
   }
 
   $item_csv = array_merge(array($item_csv_columns), $item_csv_rows);
+
+  //print_r($item_csv);
+  //exit(1);
 
   $fp = fopen($file_path, 'wb');
   foreach( $item_csv as $item_csv_row ) {
