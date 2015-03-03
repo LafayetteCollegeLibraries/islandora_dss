@@ -311,7 +311,11 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
   $items['islandora-large-image-derive-jpeg'] =
     array(
 	  'description' => dt(''),
-	  'aliases' => array(''));
+	  'aliases' => array());
+
+  $items['islandora-large-image-generate-derivative-jpg-full'] =
+    array('description' => dt('Generate large JPEG derivatives for Large Image Objects'),
+	  'aliases' => array());
 
   /**
    * Islandora "tokens" Module tasks
@@ -365,7 +369,6 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
   $items['islandora-metadb-report-duplicates'] =
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
-
   $items['islandora-metadb-metadata-export'] =
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
@@ -442,6 +445,7 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 	  'examples' => array('Standard example' => '',
 			      ),
 	  'aliases' => array());
+
 
   $items['islandora-collection-replace-placeholder-derivatives'] =
     array(
@@ -635,6 +639,16 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg2' => dt(''),
 			       ),
 	  'aliases' => array());
+
+  $items['islandora-book-generate-derivative-jpg-full'] =
+    array(
+	  'description' => dt('Generate branded, fully-sized JPEG derivatives for Islandora Large Image and Page Objects'),
+	  'arguments' => array('arg1' => dt('the collection'),
+			       ),
+	  'examples' => array('Standard example' => '',
+			      ),
+	  'aliases' => array());
+
 
   /**
    * Geology Department Slide Collection tasks

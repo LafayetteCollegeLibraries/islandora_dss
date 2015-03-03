@@ -246,8 +246,32 @@ function drush_islandora_dss_islandora_metadb_metadata_export($file_path,
 	    $object_url = url($object_path, array('absolute' => TRUE, 'https' => TRUE));
 
 	    // Retrieve the URL for the Book Objects
-	    $object_url_front_jpeg = '';
-	    $object_url_back_jpeg = '';
+	    module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+	    // @see islandora_book_islandora_delete_object_form_delete_pages_submit()
+	    $get_pid = function($o) {
+
+	      return $o['pid'];
+	    };
+
+	    $pages = islandora_paged_content_get_pages($object);
+	    $page_values = array_map($get_pid, islandora_paged_content_get_pages($object));
+	    $page_pids = array_values($page_values);
+
+	    $front_page_pid = array_shift($page_pids);
+	    $back_page_pid = array_pop($page_pids);
+
+	    $front_page_path = "islandora/object/$front_page_pid/datastream/JPG-FULL/view";
+	    $object_url_front_jpeg = url($front_page_path, array('absolute' => TRUE, 'https' => TRUE));
+
+	    if(!empty($back_page_pid)) {
+
+	      $back_page_path = "islandora/object/$back_page_pid/datastream/JPG-FULL/view";
+	      $object_url_back_jpeg = url($back_page_path, array('absolute' => TRUE, 'https' => TRUE));
+	    } else {
+
+	      $object_url_back_jpeg = '';
+	    }
 
 	    $item_record = $mods_factory->get_csv_row($metadb_project_name, $metadb_item_number, $item_csv_columns,
 						      $object_url,

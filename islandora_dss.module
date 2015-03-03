@@ -807,23 +807,43 @@ function islandora_dss_update_islandora_paths($coll_pid, $solr_host = 'localhost
   }
 }
 
+/**
+ * Retrieve the MetaDB Item ID for a given Object
+ *
+ */
 function islandora_dss_get_metadb_id($object) {
 
-  drush_log( dt('Retrieving the MetaDB ID for the Object !object_id', array('!object_id' => $object->id)), 'ok' );
+  
+  $metadb_id = '';
 
-  $mods_doc = new SimpleXMLElement($object['MODS']->content);
+  if(!isset($object['MODS'])) {
 
-  $mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
-  $result = $mods_doc->xpath('//mods:title');
+    // Attempt to parse the MetaDB ID from the label
+    $label = $object->label;
+    if(preg_match('/([a-z]+\-[a-z]+\-\d{4})\.(tif|jpg)$/', 'imperial-postcards-0442.tif', $m)) {
 
-  $map = function($relation_is_part_of_elem) {
+      $metadb_id = $m[1];
+    }
+  } else {
 
-    return (string) $relation_is_part_of_elem;
-  };
-  $metadb_download_url = array_pop(array_map($map, $mods_doc->xpath('//mods:location/mods:url[@displayLabel="Download"]')));
+    $mods_doc = new SimpleXMLElement($object['MODS']->content);
 
-  preg_match('/\=(.+)$/', $metadb_download_url, $m);
-  return $m[1];
+    $mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+    $result = $mods_doc->xpath('//mods:title');
+
+    $map = function($relation_is_part_of_elem) {
+
+      return (string) $relation_is_part_of_elem;
+    };
+    $metadb_download_url = array_pop(array_map($map, $mods_doc->xpath('//mods:location/mods:url[@displayLabel="Download"]')));
+
+    if(preg_match('/\=(.+)$/', $metadb_download_url, $m)) {
+
+      $metadb_id = $m[1];
+    }
+  }
+
+  return $metadb_id;
 }
 
 function islandora_dss_get_metadb_file_path($object, $is_back = FALSE) {
@@ -846,7 +866,16 @@ function islandora_dss_get_metadb_file_path($object, $is_back = FALSE) {
 				  'cpw-nofuko' => 'nofuko/nofuko-missing-pages-hoover-originals' // 5 digit //jpg
 				  );
 
+  $file_path = '';
+
+  drush_log( dt('Retrieving the MetaDB ID for the Object !object_id...', array('!object_id' => $object->id)), 'ok' );
   $metadb_id = islandora_dss_get_metadb_id($object);
+
+  if(empty($metadb_id)) {
+
+    drush_log( dt('Failed to retrieving the MetaDB ID for the Object !object_id...', array('!object_id' => $object->id)), 'error' );
+    return $file_path;
+  }
 
   $metadb_id = preg_replace('/0(\d{4})$/', '\1', $metadb_id);
 
@@ -864,8 +893,19 @@ function islandora_dss_get_metadb_file_path($object, $is_back = FALSE) {
   return '/mnt/smb/images/projects/master/MetaDB/' . "$subdir/" . 'lc-spcol-' . $metadb_id . '.tif';
 }
 
+/**
+ * Retrieve the CONTENTdm Collections from the MODS Document appended to an Object
+ *
+ */
 function islandora_dss_get_cdm_collections($object) {
 
+  $collections = array();
+
+  if(!isset($object['MODS'])) {
+
+    
+    return $collections;
+  }
   $mods_doc = new SimpleXMLElement($object['MODS']->content);
 
   $mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
@@ -875,7 +915,10 @@ function islandora_dss_get_cdm_collections($object) {
 
     return (string) $relation_is_part_of_elem;
   };
-  return array_map($map, $mods_doc->xpath('//mods:note[@type="admin"]'));
+
+  $collections = array_map($map, $mods_doc->xpath('//mods:note[@type="admin"]'));
+
+  return $collections;
 }
 
 /**
@@ -923,13 +966,15 @@ function islandora_dss_large_image_imagemagick_convert($src, $dest, $args) {
  * Generate branded JPEG derivatives for Islandora Book Objects
  *
  */
-function islandora_dss_generate_derivative_jpg_book($pid) {
+function islandora_dss_generate_derivative_jpg_book($pid, $connection, $collection_name = '') {
 
-  $url = 'http://localhost:8080/fedora';
-  $connection = islandora_get_tuque_connection(user_load(1), $url);
   $object = $connection->repository->getObject(urldecode($pid));
 
-  $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
+  if(empty($collection_name)) {
+
+    $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
+  }
+
   $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");
 
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
@@ -962,24 +1007,27 @@ function islandora_dss_generate_derivative_jpg_book($pid) {
  * @todo Refactor (possibly using hooks)
  *
  */
-function islandora_dss_generate_derivative_jpg_full_book($pid) {
+function islandora_dss_generate_derivative_jpg_full_book($pid, $collection_name = '') {
 
-  $url = 'http://localhost:8080/fedora';
-  $connection = islandora_get_tuque_connection(user_load(1), $url);
+  $connection = islandora_get_tuque_connection(user_load(1));
   $object = $connection->repository->getObject(urldecode($pid));
 
-  $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
+  if(empty($collection_name)) {
+
+    $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
+  }
+
   $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");
 
+  // Retrieve the Page Objects for the Book
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
-  // @see islandora_book_islandora_delete_object_form_delete_pages_submit()
   $get_pid = function($o) {
+
     return $o['pid'];
   };
+  $page_pids = array_values(array_map($get_pid, islandora_paged_content_get_pages($object)));
 
   drush_log( dt('Deriving the branded JPEG\'s for the book !object_id', array('!object_id' => $object->id)), 'ok' );
-
-  $page_pids = array_values(array_map($get_pid, islandora_paged_content_get_pages($object)));
 
   if(count($page_pids) == 1) {
 
@@ -995,7 +1043,6 @@ function islandora_dss_generate_derivative_jpg_full_book($pid) {
     }
   }
 }
-
 
 
 /**
@@ -1026,10 +1073,11 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
 
   drush_log( dt('Deriving the branded JPEG for !object_id', array('!object_id' => $object->id)), 'ok' );
 
-  if(!isset($collection_name)) {
+  if(is_null($collection_name)) {
 
     $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
   }
+
   if(!isset($path_alias)) {
 
     $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");
@@ -1201,6 +1249,8 @@ function islandora_dss_generate_derivative_jpg_full_large_image($pid, $connectio
 
   return $result;
 }
+
+
 
 /**
  * Generate derivatives for a Book Object

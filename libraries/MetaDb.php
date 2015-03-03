@@ -129,10 +129,10 @@ class MetaDbModsFactory {
 
     if(!is_null($object_url)) {
 
-      $item_csv_external_fields = array($project_name, $item_id,
-					$object_url,
+      $item_csv_external_fields = array($object_url,
 					$object_url_front_jpeg,
-					$object_url_back_jpeg);
+					$object_url_back_jpeg,
+					$project_name, $item_id);
     } else {
 
       $item_csv_external_fields = array($project_name, $item_id);
