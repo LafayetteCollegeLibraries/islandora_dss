@@ -85,9 +85,17 @@ class MetaDbModsFactory {
     fclose($fp);
   }
 
+  /**
+   * This should be restructured for a different class
+   * @todo Implement for a child class developed for handling MetaDB item metadata
+   *
+   */
   function get_csv_row($project_name,
 		       $item_id,
-		       &$item_csv_columns) {
+		       &$item_csv_columns,
+		       $object_url = NULL,
+		       $object_url_front_jpeg = NULL,
+		       $object_url_back_jpeg = NULL) {
 
     $item_csv = array();
     $item_csv_fields = array();
@@ -119,8 +127,18 @@ class MetaDbModsFactory {
 
     //return $item_csv_fields;
 
-    $item_csv_record = array_merge(array($project_name,
-					 $item_id), $item_csv_fields);
+    if(!is_null($object_url)) {
+
+      $item_csv_external_fields = array($project_name, $item_id,
+					$object_url,
+					$object_url_front_jpeg,
+					$object_url_back_jpeg);
+    } else {
+
+      $item_csv_external_fields = array($project_name, $item_id);
+    }
+
+    $item_csv_record = array_merge($item_csv_external_fields, $item_csv_fields);
 
     return $item_csv_record;
   }

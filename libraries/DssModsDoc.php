@@ -9,7 +9,29 @@
 
 class DssMetaDbProject {
 
+  static public $project_prefix_name_map = array(
+						 'oa' => 'pa-omitsu01',
+						 'ob' => 'pa-omitsu02',
+						 'fd' => 'pacwar-postcards',
+						 'ip' => 'imperial-postcards',
+						 'cf' => 'lin-postcards');
+
   public $name;
+
+  static function get_project_name($metadb_id) {
+
+    $project_name = NULL;
+
+    preg_match('/([a-z]+)\d{4}/', $metadb_id, $m);
+    $metadb_id_prefix = $m[1];
+
+    if(!array_key_exists($metadb_id_prefix, self::$project_prefix_name_map)) {
+
+      throw new Exception("Could not retrieve the MetaDB Project name for " . $metadb_id);
+    }
+
+    return $project_name = self::$project_prefix_name_map[$metadb_id_prefix];
+  }
   
   function __construct($name) {
 
