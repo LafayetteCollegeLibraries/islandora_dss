@@ -185,11 +185,118 @@ function drush_islandora_dss_islandora_metadb_report_duplicates($metadb_collecti
   }
 }
 
-//   $items['islandora-metadb-mods-ingest'] =
+/**
+ * Exporting MetaDB metadata within a CSV
+ * @params $metabb_collection_name
+ *
+ */
 
-function islandora_dss_metadb_extract($pg_host, $pg_user, $pg_password, $project_name, $item) {
+function drush_islandora_dss_islandora_metadb_metadata_export($file_path,
+							      $solr_host = 'localhost',
+							      $solr_path = 'solr/fedora',
+							      $metadb_item_id_file_path = NULL,
+							      $metadb_collection_name = NULL,
+							      $metadb_project_name = NULL) {
 
+  // Instantiate the connection as the admin user
+  $connection = islandora_get_tuque_connection(user_load(1));
+  $mods_factory = new MetaDbModsFactory('127.0.0.1');
+  //$mods_doc = $mods_factory->get_doc($project_name, $item_id);
 
+  $solr = new Apache_Solr_Service($solr_host, 8080, $solr_path . '/');
+  $index = new IslandoraSolrIndex($solr);
 
+  // Extract MetaDB Item ID's from the file paths
+  if(!is_null($metadb_item_id_file_path)) {
+
+    $item_csv_columns = array('object_url', 'object_url_front_jpeg', 'object_url_back_jpeg', 'project_name', 'item_number');
+
+    // Parse the CSV
+    $i = 0;
+    if (($handle = fopen($metadb_item_id_file_path, "r")) !== FALSE) {
+
+      while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+
+	$metadb_id = $data[0];
+	$dc_title_query = preg_replace('/\[/', '\[', $metadb_id);
+	$dc_title_query = preg_replace('/\]/', '\]', $dc_title_query);
+
+	$solr_query = "dc.title:$dc_title_query*";
+
+	// Retrieve the MetaDB project name from the prefix
+	// This is, unfortunately, merely a constant
+	$metadb_project_name = DssMetaDbProject::get_project_name($metadb_id);
+
+	$solr_results = $index->search($solr_query, array('fl' => 'PID', 'sort' => 'dc.title asc'));
+
+	if(empty($solr_results['response']['docs'])) {
+	  
+	  drush_log(dt('Could not find any Objects bearing the MetaDB ID %metadb_id', array('%metadb_id' => $metadb_id)), 'warning');
+	} else {
+
+	  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+	    $object = islandora_object_load($solr_doc['PID']);
+
+	    preg_match('/\-?(\d+)\]?$/', $metadb_id, $metadb_id_match);
+	    $metadb_item_number = (int) $metadb_id_match[1];
+
+	    // Retrieve the URL for the Object
+	    $object_path = "islandora/object/{$object->id}";
+	    $object_url = url($object_path, array('absolute' => TRUE, 'https' => TRUE));
+
+	    // Retrieve the URL for the Book Objects
+	    $object_url_front_jpeg = '';
+	    $object_url_back_jpeg = '';
+
+	    $item_record = $mods_factory->get_csv_row($metadb_project_name, $metadb_item_number, $item_csv_columns,
+						      $object_url,
+						      $object_url_front_jpeg,
+						      $object_url_back_jpeg );
+	    $item_csv_rows[] = $item_record;
+
+	    $i++;
+	  }
+	}
+	
+      }
+
+      fclose($handle);
+    }
+
+  } else {
+
+  $solr_query = "cdm.Relation.IsPartOf:\"$metadb_collection_name\"";
+  $solr_results = $index->search($solr_query, array('fl' => 'PID', 'sort' => 'dc.title asc'));
+
+  $item_csv_columns = array('project_name', 'item_number');
+
+  $i = 0;
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    $object = islandora_object_load($solr_doc['PID']);
+    $metadb_id = _islandora_dss_get_cdm_id($object);
+    preg_match('/\-(\d+)$/', $metadb_id, $metadb_id_match);
+
+    $metadb_item_number = (int) $metadb_id_match[1];
+
+    $item_record = $mods_factory->get_csv_row($metadb_project_name, $metadb_item_number, $item_csv_columns);
+    $item_csv_rows[] = $item_record;
+
+    $i++;
+  }
+  }
+
+  $item_csv = array_merge(array($item_csv_columns), $item_csv_rows);
+
+  //print_r($item_csv);
+  //exit(1);
+
+  $fp = fopen($file_path, 'wb');
+  foreach( $item_csv as $item_csv_row ) {
+
+    fputcsv($fp, $item_csv_row);
+  }
+
+  fclose($fp);
 }
-

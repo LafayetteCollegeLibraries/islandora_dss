@@ -60,6 +60,89 @@ class MetaDbModsFactory {
     $this->tech_table = $tech_table;  
   }
 
+  function get_csv($project_name,
+		   $file_path,
+		   $item_id_min,
+		   $item_id_max) {
+
+    $item_csv_columns = array();
+
+    foreach(range($item_id_min, $item_id_max) as $item_id) {
+
+      $item_csv_rows[] = get_csv_row($project_name, $item_id, $item_csv_columns);
+    }
+
+    $item_csv = array_merge($item_csv_columns, $item_csv_rows);
+
+    print_r($item_csv);
+
+    $fp = fopen($file_path, 'wb');
+    foreach( $item_csv as $item_csv_row ) {
+
+      fputcsv($fp, $item_csv_row);
+    }
+
+    fclose($fp);
+  }
+
+  /**
+   * This should be restructured for a different class
+   * @todo Implement for a child class developed for handling MetaDB item metadata
+   *
+   */
+  function get_csv_row($project_name,
+		       $item_id,
+		       &$item_csv_columns,
+		       $object_url = NULL,
+		       $object_url_front_jpeg = NULL,
+		       $object_url_back_jpeg = NULL) {
+
+    $item_csv = array();
+    $item_csv_fields = array();
+
+    //$sql = "SELECT md_type,element,label,data FROM " . $this->admin_desc_table . " AS admin_desc WHERE admin_desc.item_number=$item_id AND admin_desc.project_name='$project_name' UNION SELECT 'techical',tech_element,tech_label,tech_data FROM " . $this->tech_table . " AS tech WHERE tech.item_number=$item_id AND tech.project_name='$project_name'";
+    $sql = "SELECT md_type,element,label,data FROM " . $this->admin_desc_table . " AS admin_desc WHERE admin_desc.item_number=$item_id AND admin_desc.project_name='$project_name' ORDER BY element,label";
+
+    foreach($this->pg->query($sql) as $row) {
+
+      $field_name = !empty($row['label']) ? $row['element'] . '.' . $row['label'] : $row['element'];
+
+      if(!in_array($field_name,
+		   $item_csv_columns)) {
+
+	$item_csv_columns[] = $field_name;
+      }
+
+      $data = $row['data'];
+      /*
+      if(empty($data)) {
+
+	$data = '""';
+      }
+      */
+
+      $item_csv_fields[] = $data;
+      //$item_csv_fields[$field_name] = $data;
+    }
+
+    //return $item_csv_fields;
+
+    if(!is_null($object_url)) {
+
+      $item_csv_external_fields = array($project_name, $item_id,
+					$object_url,
+					$object_url_front_jpeg,
+					$object_url_back_jpeg);
+    } else {
+
+      $item_csv_external_fields = array($project_name, $item_id);
+    }
+
+    $item_csv_record = array_merge($item_csv_external_fields, $item_csv_fields);
+
+    return $item_csv_record;
+  }
+
   function get_doc($project_name,
 		   $item_id,
 		   $mods_class = NULL) {

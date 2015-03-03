@@ -293,15 +293,15 @@ function islandora_dss_get_members($obj_pid) {
  */
 function _islandora_dss_get_cdm_id($object) {
 
-  //preg_match('/item\=.+?\-(\d+)</', $object['MODS']->content, $m);
-  preg_match('/item\=(.+?)</', $object['MODS']->content, $m);
+  $mods_str = $object['MODS']->content;
+
+  preg_match('/item\=(.+?)</', $mods_str, $m);
   $metadb_id = $m[1];
 
   /**
    * Remove the initial 0 for 5 digit identifiers
    * Resolves DSS-196
    */
-
   if(strlen($metadb_id) > 4) {
 
     $metadb_id = preg_replace('/\-\d(\d{4})/', '-\1', $metadb_id);
@@ -313,6 +313,24 @@ function _islandora_dss_get_cdm_id($object) {
    *
    */
   $metadb_id = str_replace('cap', 'hpc', $metadb_id);
+
+  /*
+   * Restructuring for certain anomalous EAIC Items
+   *
+   */
+  $metadb_id = str_replace('Photographic slides', 'slides', $metadb_id);
+
+  /*
+  $mods = new SimpleXMLElement($mods_str);
+  $mods->registerXPathNamespace("mods", "http://www.loc.gov/mods/v3");
+  $titles = $mods->xpath('//mods:title');
+  if(!empty($titles)) {
+
+    $title = array_shift($titles);
+    preg_match('/\[(.+?)\]/', $title, $title_match);
+    $metadb_id = $title_match[1];
+  }
+  */
   
   return $metadb_id;
 }
@@ -791,6 +809,8 @@ function islandora_dss_update_islandora_paths($coll_pid, $solr_host = 'localhost
 
 function islandora_dss_get_metadb_id($object) {
 
+  drush_log( dt('Retrieving the MetaDB ID for the Object !object_id', array('!object_id' => $object->id)), 'ok' );
+
   $mods_doc = new SimpleXMLElement($object['MODS']->content);
 
   $mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
@@ -836,15 +856,12 @@ function islandora_dss_get_metadb_file_path($object, $is_back = FALSE) {
 
   if($is_back and array_key_exists($subdir, $EAIC_SECONDARY_DIR_MAP)) {
 
-    //return '/mnt/imago1/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/lc-spcol-' . $metadb_id . '.tif';
-    //return '/mnt/imago1/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/lc-spcol-' . $metadb_id . 'b.tif';
-
-    ///mnt/imago1/master/other/warner-negs-taiwan/warner-negs-taiwan-submerged-images/*0083*
-
-    return array_shift(glob('/mnt/imago1/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/*' . $metadb_id . '*'));
+    //return array_shift(glob('/mnt/imago1/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/*' . $metadb_id . '*'));
+    return array_shift(glob('/mnt/smb/images/projects/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/*' . $metadb_id . '*'));
   }
 
-  return '/mnt/imago1/master/MetaDB/' . "$subdir/" . 'lc-spcol-' . $metadb_id . '.tif';
+  //return '/mnt/imago1/master/MetaDB/' . "$subdir/" . 'lc-spcol-' . $metadb_id . '.tif';
+  return '/mnt/smb/images/projects/master/MetaDB/' . "$subdir/" . 'lc-spcol-' . $metadb_id . '.tif';
 }
 
 function islandora_dss_get_cdm_collections($object) {
@@ -902,6 +919,10 @@ function islandora_dss_large_image_imagemagick_convert($src, $dest, $args) {
   return $dest;
 }
 
+/**
+ * Generate branded JPEG derivatives for Islandora Book Objects
+ *
+ */
 function islandora_dss_generate_derivative_jpg_book($pid) {
 
   $url = 'http://localhost:8080/fedora';
@@ -917,23 +938,75 @@ function islandora_dss_generate_derivative_jpg_book($pid) {
     return $o['pid'];
   };
 
-  $is_back = FALSE;
-  foreach(array_values(array_map($get_pid, islandora_paged_content_get_pages($object))) as $page_pid) {
+  drush_log( dt('Deriving the branded JPEG\'s for the book !object_id', array('!object_id' => $object->id)), 'ok' );
 
-    islandora_dss_generate_derivative_jpg_large_image($page_pid, $connection, $collection_name, $path_alias, $is_back);
-    $is_back = TRUE;
+  $page_pids = array_values(array_map($get_pid, islandora_paged_content_get_pages($object)));
+
+  if(count($page_pids) == 1) {
+
+    $page_pid = array_shift($page_pids);
+    islandora_dss_generate_derivative_jpg_large_image($page_pid, $connection, $collection_name, $path_alias, FALSE);
+  } else {
+
+    $is_back = FALSE;
+    foreach($page_pids as $page_pid) {
+
+      islandora_dss_generate_derivative_jpg_large_image($page_pid, $connection, $collection_name, $path_alias, $is_back);
+      $is_back = TRUE;
+    }
+  }
+}
+
+/**
+ * Generate branded, fully-sized JPEG derivatives for Islandora Book Objects
+ * @todo Refactor (possibly using hooks)
+ *
+ */
+function islandora_dss_generate_derivative_jpg_full_book($pid) {
+
+  $url = 'http://localhost:8080/fedora';
+  $connection = islandora_get_tuque_connection(user_load(1), $url);
+  $object = $connection->repository->getObject(urldecode($pid));
+
+  $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
+  $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");
+
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+  // @see islandora_book_islandora_delete_object_form_delete_pages_submit()
+  $get_pid = function($o) {
+    return $o['pid'];
+  };
+
+  drush_log( dt('Deriving the branded JPEG\'s for the book !object_id', array('!object_id' => $object->id)), 'ok' );
+
+  $page_pids = array_values(array_map($get_pid, islandora_paged_content_get_pages($object)));
+
+  if(count($page_pids) == 1) {
+
+    $page_pid = array_shift($page_pids);
+    islandora_dss_generate_derivative_jpg_full_large_image($page_pid, $connection, $collection_name, $path_alias, FALSE);
+  } else {
+
+    $is_back = FALSE;
+    foreach($page_pids as $page_pid) {
+
+      islandora_dss_generate_derivative_jpg_full_large_image($page_pid, $connection, $collection_name, $path_alias, $is_back);
+      $is_back = TRUE;
+    }
   }
 }
 
 
 
 /**
- * Generate paths for Islandora Collection Objects
+ * Generate branded JPEG derivatives for Islandora Large Image and Page Objects
  *
  * @todo Refactor into a class for Islandora Collection Objects
  *
  */
-function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = NULL, $collection_name = NULL, $path_alias = NULL, $is_back = FALSE) {
+function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = NULL, $collection_name = NULL, $path_alias = NULL,
+							   $is_back = FALSE, $delete_layers = FALSE, $resize = TRUE, $regenerate = FALSE,
+							   $ds_id = 'JPG', $ds_label = 'Medium sized JPEG') {
 
   if(!isset($connection)) {
 
@@ -941,6 +1014,17 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
     $connection = islandora_get_tuque_connection(user_load(1), $url);
   }
   $object = $connection->repository->getObject(urldecode($pid));
+
+  // Do not attempt to derive a branded JPEG for the Object if the MODS Document does not exist
+  $jpg_ds = $object[$ds_id];
+
+  if(!$regenerate && $jpg_ds->size > 9000) {
+
+    drush_log(dt("The JPG datastream for !object_id appears to been generated properly", array('!object_id' => $object->id)), 'ok');
+    return TRUE;
+  }
+
+  drush_log( dt('Deriving the branded JPEG for !object_id', array('!object_id' => $object->id)), 'ok' );
 
   if(!isset($collection_name)) {
 
@@ -956,6 +1040,8 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
   module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
 
   // Apparently, the TIFF wasn't ingested for Page Objects
+
+  /*
   if(!$object['OBJ']) {
 
     $parent = islandora_object_load(array_pop($object->getParents()));
@@ -965,27 +1051,96 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
 
     islandora_large_image_add_datastream($object, 'OBJ', $metadb_file_path, 'image/tiff', t('Lossless TIFF'));
   }
+  */
 
-  $tiff_file = file_save_data($object['OBJ']->content, "temporary://{$base_name}_OBJ.tiff");
+  //$tiff_file = file_save_data($object['OBJ']->content, "temporary://{$base_name}_OBJ.tiff");
+
+  $obj_ds = $object['OBJ'];
+  if(!$obj_ds) {
+
+    $obj_ds = $object->constructDatastream('OBJ', 'M');
+    $obj_ds->label = t('Lossless TIFF');
+    $obj_ds->mimeType = 'image/tiff';
+
+    $object->ingestDatastream($obj_ds);
+
+    $obj_data = '';
+  } else {
+
+    $obj_data = $obj_ds->content;
+  }
+
+  if(empty($obj_data)) {
+
+    drush_log("{$object->id} appears to be missing a TIFF datastream", 'error');
+
+    //$parent = islandora_object_load(array_pop($object->getParents()));
+    $metadb_file_path = islandora_dss_get_metadb_file_path($object, $is_back);
+
+    drush_log("Ingesting $metadb_file_path into the OBJ datastream for for {$object->id}...", 'ok');
+
+    //islandora_large_image_add_datastream($object, 'OBJ', $metadb_file_path, 'image/tiff', t('Lossless TIFF'));
+    $obj_ds->setContentFromFile($metadb_file_path);
+
+    drush_log("Ingested $metadb_file_path into the OBJ datastream for for {$object->id}", 'success');
+  }
+
+
+  $jp2_ds = $object['JP2'];
+
+  $jp2_data = $jp2_ds->content;
+
+  if(empty($jp2_data)) {
+
+    drush_log("{$object->id} appears to be missing a JPEG2000 datastream", 'error');
+
+    //$tiff_file = file_save_data($obj_data, "temporary://{$base_name}_OBJ.tiff");
+    $tiff_file = file_create_filename("{$base_name}_OBJ.tiff", 'temporary://');
+    $object['OBJ']->getContent($tiff_file);
+
+    $base_name = str_replace(':', '-', $object->id);
+    islandora_large_image_create_JP2_derivative($object, $tiff_file, $base_name);
+
+    //file_delete($tiff_file);
+    file_unmanaged_delete($tiff_file);
+
+    $jp2_data = $object['JP2']->content;
+
+    return FALSE;
+  }
+
+  $jp2file = file_save_data($jp2_data, "temporary://{$base_name}_OBJ.jp2");
 
   $args = array();
-  $args[] = '-resize ' . escapeshellarg("600x800");
+
+  if($resize) {
+
+    $args[] = '-resize ' . escapeshellarg("600x800");
+  } else {
+
+    $args[] = '-resize ' . escapeshellarg("1200x1600");
+  }
+
   $args[] = '-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75));
 
   // For members of the Marquis de Lafayette Prints Collection
-  //$args[] = '+delete';
+  if($delete_layers) {
+
+    $args[] = '+delete';
+  }
 
   // For the label (branding)
   $args[] = '\(';
   $args[] = '-background White';
   $args[] = '-gravity center';
+
   // Insecure
   $args[] = "label:\"$collection_name\\nLafayette College Libraries\\nhttp://digital.lafayette.edu/$path_alias\"";
   $args[] = '\)';
   $args[] = '-append';
 
-  $derivative_file = islandora_large_image_imagemagick_convert($tiff_file->uri, "temporary://{$base_name}_JPG.jpg", $args);
-  //$derivative_file = islandora_dss_large_image_imagemagick_convert($tiff_file->uri, "temporary://{$base_name}_JPG.jpg", $args);
+  $derivative_file = islandora_large_image_imagemagick_convert($jp2file->uri, "temporary://{$base_name}_JPG.jpg", $args);
+
   if ($derivative_file === FALSE) {
 
     drupal_set_message(t('Failed to create JPG derivative'), 'error');
@@ -993,19 +1148,25 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
   }
   drush_log("Successfully generated the JPG for {$object->id}", 'success');
 
-  $jpg_ds = $object['JPG'];
+  $jpg_ds = $object[$ds_id];
   if($jpg_ds) {
 
     islandora_delete_datastream($jpg_ds);
   }
 
-  islandora_large_image_add_datastream($object, 'JPG', $derivative_file, 'image/jpeg', t('Medium sized JPEG'));
+  islandora_large_image_add_datastream($object, $ds_id, $derivative_file, 'image/jpeg', t($ds_label));
   drush_log("Successfully ingested the JPG into the JPG datastream for {$object->id}", 'success');
+
+  if($jpg_ds->size < 9000) {
+
+    drush_log(dt("The JPG datastream for !object_id appears to be conspicuously small (!size); the derivative may not have been generated properly", array('!size' => $jpg_ds->size,
+																			   '!object_id' => $object->id)), 'warning');
+  }
 
   /*
   try {
 
-    file_delete($tiff_file);
+    file_delete($jp2file);
   } catch(PDOException $e) {
 
     drush_log("Could not delete the temporary TIFF file: {$e->getMessage()}", 'warning');
@@ -1019,40 +1180,27 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
     drush_log("Could not delete the temporary JPEG file: {$e->getMessage()}", 'warning');
   }
   */
-  file_delete($tiff_file);
+  file_delete($jp2file);
   $result = file_unmanaged_delete($derivative_file);
 
   return $result;
 }
 
-function islandora_dss_generate_jpeg_derivative_book($coll_pid) {
+/**
+ * Generate branded, fully-sized JPEG derivatives for Islandora Large Image and Page Objects
+ * @todo Refactor with islandora_dss_generate_derivative_jpg_large_image
+ *
+ * @todo Refactor into a class for Islandora Collection Objects
+ *
+ */
+function islandora_dss_generate_derivative_jpg_full_large_image($pid, $connection = NULL, $collection_name = NULL, $path_alias = NULL,
+								$is_back = FALSE, $delete_layers = FALSE, $regenerate = FALSE) {
 
-}
+  $result = islandora_dss_generate_derivative_jpg_large_image($pid, $connection, $collection_name, $path_alias,
+							      $is_back, $delete_layers, FALSE, $regenerate, 'JPG-FULL', 'Fully Sized JPEG');
 
-/*
-function islandora_book_upload_page_form_submit(array $form, array &$form_state) {
-  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
-  $object = islandora_ingest_form_get_object($form_state);
-  $file = file_load($form_state['values']['file']);
-  $object->label = $file->filename;
-  islandora_paged_content_update_datastream($object, drupal_realpath($file->uri), 'OBJ', NULL, NULL, 'M', FALSE);
-  // Update RELS-EXT properties, page/sequence/etc, and append the page at the
-  // end of the book.
-  $rels_ext = $object->relationships;
-  $language = $form_state['values']['language'];
-  $shared_storage = islandora_ingest_form_get_shared_storage($form_state);
-  $book = islandora_object_load($shared_storage['book']);
-  $pages = islandora_paged_content_get_pages($book);
-  $num_pages = count($pages) + 1;
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
-  islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
-  islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
+  return $result;
 }
-*/
 
 /**
  * Generate derivatives for a Book Object
