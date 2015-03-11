@@ -311,7 +311,11 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
   $items['islandora-large-image-derive-jpeg'] =
     array(
 	  'description' => dt(''),
-	  'aliases' => array(''));
+	  'aliases' => array());
+
+  $items['islandora-large-image-generate-derivative-jpg-full'] =
+    array('description' => dt('Generate large JPEG derivatives for Large Image Objects'),
+	  'aliases' => array());
 
   /**
    * Islandora "tokens" Module tasks
@@ -365,7 +369,6 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
   $items['islandora-metadb-report-duplicates'] =
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
-
   $items['islandora-metadb-metadata-export'] =
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
 	  'aliases' => array());
@@ -374,6 +377,15 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
    * Islandora/Drupal Path Alias management tasks
    *
    */
+  $items['islandora-collection-generate-path'] =
+    array(
+	  'description' => dt('Generate path for Islandora Object'),
+	  'arguments' => array(
+			       'arg1' => dt('the Fedora Commons Object PID'),
+			       ),
+	  'examples' => array('Standard example' => '',
+			      ),
+	  'aliases' => array());
 
   $items['islandora-collection-generate-paths'] =
     array(
@@ -635,6 +647,16 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg2' => dt(''),
 			       ),
 	  'aliases' => array());
+
+  $items['islandora-book-generate-derivative-jpg-full'] =
+    array(
+	  'description' => dt('Generate branded, fully-sized JPEG derivatives for Islandora Large Image and Page Objects'),
+	  'arguments' => array('arg1' => dt('the collection'),
+			       ),
+	  'examples' => array('Standard example' => '',
+			      ),
+	  'aliases' => array());
+
 
   /**
    * Geology Department Slide Collection tasks
@@ -1354,6 +1376,13 @@ function drush_islandora_dss_islandora_collection_purge_paths($collection_name =
  * Generate paths for Islandora Objects
  *
  */
+function drush_islandora_dss_islandora_collection_generate_path($pid, $collection_name, $date = '') {
+
+  $member = islandora_object_load($pid);
+
+  islandora_dss_generate_islandora_path($collection_name, $member, $date);
+}
+
 function drush_islandora_dss_islandora_collection_generate_paths($collection_name = NULL, $solr_host = 'localhost') {
 
   if(!isset($collection_name)) {

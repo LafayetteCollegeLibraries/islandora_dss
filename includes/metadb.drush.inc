@@ -209,7 +209,44 @@ function drush_islandora_dss_islandora_metadb_metadata_export($file_path,
   // Extract MetaDB Item ID's from the file paths
   if(!is_null($metadb_item_id_file_path)) {
 
-    $item_csv_columns = array('object_url', 'object_url_front_jpeg', 'object_url_back_jpeg', 'project_name', 'item_number');
+    //$item_csv_columns = array('object_url', 'object_url_front_jpeg', 'object_url_back_jpeg', 'project_name', 'item_number');
+    //$item_csv_columns = array('project_name', 'item_number');
+    //$item_csv_columns = array();
+    $item_csv_columns = array('title.english',
+			    'title.chinese',
+			    'title.japanese',
+			    'title.korean',
+			    'subject.ocm',
+			    'description.critical',
+			    'description.text.english',
+			    'description.text.japanese',
+			    'description.inscription.english',
+			    'description.inscription.japanese',
+			    'description.ethnicity',
+			    'coverage.location.country',
+			    'coverage.location',
+			    'format.medium',
+			    'description.indicia',
+			    'creator.maker',
+			    'creator.company',
+			    'description.citation',
+			    'relation.seealso',
+			    'contributor',
+			    'date.original',
+			    'date.artifact.upper',
+			    'date.artifact.lower',
+			    'date.image.upper',
+			    'date.image.lower',
+			    'date.search',
+
+			    'identifier.dmrecord',
+			    'format.extent',
+			    'relation.ispartof',
+			    'format.digital',
+			    'publisher.digital',
+			    'rights.digital',
+			    'creator.digital'
+			    );
 
     // Parse the CSV
     $i = 0;
@@ -246,8 +283,37 @@ function drush_islandora_dss_islandora_metadb_metadata_export($file_path,
 	    $object_url = url($object_path, array('absolute' => TRUE, 'https' => TRUE));
 
 	    // Retrieve the URL for the Book Objects
-	    $object_url_front_jpeg = '';
-	    $object_url_back_jpeg = '';
+	    module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+	    // @see islandora_book_islandora_delete_object_form_delete_pages_submit()
+	    $get_pid = function($o) {
+
+	      return $o['pid'];
+	    };
+
+	    $pages = islandora_paged_content_get_pages($object);
+	    $page_values = array_map($get_pid, islandora_paged_content_get_pages($object));
+	    $page_pids = array_values($page_values);
+
+	    $front_page_pid = array_shift($page_pids);
+	    $back_page_pid = array_pop($page_pids);
+
+	    $front_page_path = "islandora/object/$front_page_pid/datastream/JPG-FULL/view";
+	    $object_url_front_jpeg = url($front_page_path, array('absolute' => TRUE, 'https' => TRUE));
+
+	    if(!empty($back_page_pid)) {
+
+	      $back_page_path = "islandora/object/$back_page_pid/datastream/JPG-FULL/view";
+	      $object_url_back_jpeg = url($back_page_path, array('absolute' => TRUE, 'https' => TRUE));
+	    } else {
+
+	      $object_url_back_jpeg = '';
+	    }
+
+	    // Work-around for staging
+	    $object_url = preg_replace('/digital\.stage\.lafayette/', 'digital.lafayette', $object_url);
+	    $object_url_front_jpeg = preg_replace('/digital\.stage\.lafayette/', 'digital.lafayette', $object_url_front_jpeg);
+	    $object_url_back_jpeg = preg_replace('/digital\.stage\.lafayette/', 'digital.lafayette', $object_url_back_jpeg);
 
 	    $item_record = $mods_factory->get_csv_row($metadb_project_name, $metadb_item_number, $item_csv_columns,
 						      $object_url,
@@ -266,26 +332,28 @@ function drush_islandora_dss_islandora_metadb_metadata_export($file_path,
 
   } else {
 
-  $solr_query = "cdm.Relation.IsPartOf:\"$metadb_collection_name\"";
-  $solr_results = $index->search($solr_query, array('fl' => 'PID', 'sort' => 'dc.title asc'));
+    $solr_query = "cdm.Relation.IsPartOf:\"$metadb_collection_name\"";
+    $solr_results = $index->search($solr_query, array('fl' => 'PID', 'sort' => 'dc.title asc'));
 
-  $item_csv_columns = array('project_name', 'item_number');
+    $item_csv_columns = array('project_name', 'item_number');
 
-  $i = 0;
-  foreach($solr_results['response']['docs'] as $solr_doc) {
+    $i = 0;
+    foreach($solr_results['response']['docs'] as $solr_doc) {
 
-    $object = islandora_object_load($solr_doc['PID']);
-    $metadb_id = _islandora_dss_get_cdm_id($object);
-    preg_match('/\-(\d+)$/', $metadb_id, $metadb_id_match);
+      $object = islandora_object_load($solr_doc['PID']);
+      $metadb_id = _islandora_dss_get_cdm_id($object);
+      preg_match('/\-(\d+)$/', $metadb_id, $metadb_id_match);
 
-    $metadb_item_number = (int) $metadb_id_match[1];
+      $metadb_item_number = (int) $metadb_id_match[1];
 
-    $item_record = $mods_factory->get_csv_row($metadb_project_name, $metadb_item_number, $item_csv_columns);
-    $item_csv_rows[] = $item_record;
+      $item_record = $mods_factory->get_csv_row($metadb_project_name, $metadb_item_number, $item_csv_columns);
+      $item_csv_rows[] = $item_record;
 
-    $i++;
+      $i++;
+    }
   }
-  }
+
+  $item_csv_columns = array_merge($item_csv_columns, array('project_name', 'item_number', 'object_url', 'object_url_front_jpeg', 'object_url_back_jpeg'));
 
   $item_csv = array_merge(array($item_csv_columns), $item_csv_rows);
 

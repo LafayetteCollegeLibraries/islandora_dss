@@ -101,7 +101,48 @@ class MetaDbModsFactory {
     $item_csv_fields = array();
 
     //$sql = "SELECT md_type,element,label,data FROM " . $this->admin_desc_table . " AS admin_desc WHERE admin_desc.item_number=$item_id AND admin_desc.project_name='$project_name' UNION SELECT 'techical',tech_element,tech_label,tech_data FROM " . $this->tech_table . " AS tech WHERE tech.item_number=$item_id AND tech.project_name='$project_name'";
-    $sql = "SELECT md_type,element,label,data FROM " . $this->admin_desc_table . " AS admin_desc WHERE admin_desc.item_number=$item_id AND admin_desc.project_name='$project_name' ORDER BY element,label";
+    //$sql = "SELECT md_type,element,label,data FROM " . $this->admin_desc_table . " AS admin_desc WHERE admin_desc.item_number=$item_id AND admin_desc.project_name='$project_name' ORDER BY element,label";
+    $sql = "SELECT md_type,element,label,data FROM " . $this->admin_desc_table . " AS admin_desc WHERE admin_desc.item_number=$item_id AND admin_desc.project_name='$project_name' ORDER BY attribute_id";
+
+    $field_name_map = array('title.english',
+			    'title.chinese',
+			    'title.japanese',
+			    'title.korean',
+			    'subject.ocm',
+			    'description.critical',
+			    'description.text.english',
+			    'description.text.japanese',
+			    'description.inscription.english',
+			    'description.inscription.japanese',
+			    'description.ethnicity',
+			    'coverage.location.country',
+			    'coverage.location',
+			    'format.medium',
+			    'description.indicia',
+			    'creator.maker',
+			    'creator.company',
+			    'description.citation',
+			    'relation.seealso',
+			    'contributor',
+			    'date.original',
+			    'date.artifact.upper',
+			    'date.artifact.lower',
+			    'date.image.upper',
+			    'date.image.lower',
+			    'date.search',
+
+			    'identifier.dmrecord',
+			    'format.extent',
+			    'relation.ispartof',
+			    'format.digital',
+			    'publisher.digital',
+			    'rights.digital',
+			    'creator.digital'
+			    );
+
+    $item_csv_columns = array_merge($item_csv_columns, $field_name_map);
+
+    $field_name_map = array_flip($field_name_map);
 
     foreach($this->pg->query($sql) as $row) {
 
@@ -110,7 +151,7 @@ class MetaDbModsFactory {
       if(!in_array($field_name,
 		   $item_csv_columns)) {
 
-	$item_csv_columns[] = $field_name;
+	//$item_csv_columns[] = $field_name;
       }
 
       $data = $row['data'];
@@ -121,24 +162,38 @@ class MetaDbModsFactory {
       }
       */
 
-      $item_csv_fields[] = $data;
+      //$item_csv_fields[] = $data;
+
+      print $field_name;
+      print $i;
+
+      $i = $field_name_map[$field_name];
+      $item_csv_fields[$i] = $data;
+      print_r($item_csv_fields);
+
       //$item_csv_fields[$field_name] = $data;
     }
+    ksort($item_csv_fields);
+    print_r($item_csv_fields);
+    //exit(1);
 
     //return $item_csv_fields;
 
+    $item_csv_external_fields = array($project_name, $item_id);
+
     if(!is_null($object_url)) {
 
-      $item_csv_external_fields = array($project_name, $item_id,
-					$object_url,
-					$object_url_front_jpeg,
-					$object_url_back_jpeg);
+      $item_csv_record = array_merge(
+				     //$item_csv_external_fields,
+				     $item_csv_fields,
+				     $item_csv_external_fields,
+				     array($object_url,
+					   $object_url_front_jpeg,
+					   $object_url_back_jpeg));
     } else {
 
-      $item_csv_external_fields = array($project_name, $item_id);
+      $item_csv_record = array_merge($item_csv_external_fields, $item_csv_fields);
     }
-
-    $item_csv_record = array_merge($item_csv_external_fields, $item_csv_fields);
 
     return $item_csv_record;
   }

@@ -253,10 +253,12 @@ function drush_islandora_dss_islandora_book_newspaper_ingest_set($csv_file, $col
 
       if(count($data) > 2) {
 
+	//drush_islandora_dss_islandora_book_newspaper_ingest($data[0], $data[1], $data[2]);
 	drush_islandora_dss_islandora_book_newspaper_ingest($data[0], $data[1], $data[2]);
       } else {
 
-	islandora_dss_islandora_book_newspaper_ingest($data[0], $data[1]);
+	//islandora_dss_islandora_book_newspaper_ingest($data[0], $data[1]);
+	drush_islandora_dss_islandora_book_newspaper_ingest($data[0], $data[1]);
       }
     }
   }
