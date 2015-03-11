@@ -617,6 +617,64 @@ function islandora_dss_purge_islandora_paths($coll_pid, $solr_host = 'localhost'
  * @todo Refactor into a class for Islandora Collection Objects
  *
  */
+function islandora_dss_generate_islandora_path($subcollection, $member, $date = '') {
+
+      //$subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
+
+      //$member = islandora_object_load($solr_doc['PID']);
+
+      /**
+       * Handling for members of the Alumni Publications Collection
+       *
+       */
+      if($subcollection == 'Alumni Publications') {
+      
+	if(!preg_match('/_(\d+)[A-Z]?$/', $member->label, $m)) {
+
+	  drush_log(dt("Cannot generate the path for !member_label", array('!member_label' => $member->label)), 'warning');
+	  continue;
+	} else {
+
+	  $alias = 'collections/alumni/' . $m[1];
+	}
+
+      /**
+       * Specialized handling for the newspaper aliases
+       *
+       */
+      } elseif($subcollection == 'Lafayette Newspaper Collection') {
+
+	//$alias = $solr_doc['dc.date.sort'];
+	$alias = $date;
+
+	preg_match('/(\d{4}-\d{2}-\d{2})/', $alias, $m);
+	$alias = 'collections/newspaper/' . implode(explode('-', $m[1]));
+      } else {
+
+	$alias = islandora_dss_get_alias_metadb($member, $subcollection);
+      }
+
+      $path = array('source' => "islandora/object/{$member->id}",
+		    'alias' => $alias);
+
+      drush_log("Generating $alias for {$member->id} within $subcollection", 'ok');
+      path_delete(array('source' => $path['source']));
+
+      if($alias == 'collections/') {
+
+	drush_log("Cannot generate the path for {$member->id}", 'warn');
+	exit(1);
+      }
+
+      path_save($path);
+}
+
+/**
+ * Generate paths for Islandora Collection Objects
+ *
+ * @todo Refactor into a class for Islandora Collection Objects
+ *
+ */
 function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localhost') {
 
   $solr = new Apache_Solr_Service($solr_host, 8080, 'solr/fedora_5' . '/');
@@ -660,51 +718,11 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
 
       $member = islandora_object_load($solr_doc['PID']);
 
-      /**
-       * Handling for members of the Alumni Publications Collection
-       *
-       */
-      if($subcollection == 'Alumni Publications') {
-      
-	if(!preg_match('/_(\d+)[A-Z]?$/', $member->label, $m)) {
-
-	  drush_log(dt("Cannot generate the path for !member_label", array('!member_label' => $member->label)), 'warning');
-	  continue;
-	} else {
-
-	  $alias = 'collections/alumni/' . $m[1];
-	}
-
-      /**
-       * Specialized handling for the newspaper aliases
-       *
-       */
-      } elseif($subcollection == 'Lafayette Newspaper Collection') {
-
-	$alias = $solr_doc['dc.date.sort'];
-	preg_match('/(\d{4}-\d{2}-\d{2})/', $alias, $m);
-	$alias = 'collections/newspaper/' . implode(explode('-', $m[1]));
-      } else {
-
-	$alias = islandora_dss_get_alias_metadb($member, $subcollection);
-      }
-
-      $path = array('source' => "islandora/object/{$solr_doc['PID']}",
-		    'alias' => $alias);
-
-      drush_log("Generating $alias for {$solr_doc['PID']} within $subcollection", 'ok');
-      path_delete(array('source' => $path['source']));
-
-      if($alias == 'collections/') {
-
-	drush_log("Cannot generate the path for {$solr_doc['PID']}", 'warn');
-	exit(1);
-      }
-
-      path_save($path);
+      islandora_dss_generate_islandora_path($subcollection, $member, $solr_doc['dc.date.sort']);
 
       // Is there a back for these images?
       drush_log("Successfully generated the path {$path['alias']} for {$solr_doc['PID']}", 'success');
+
     } catch(Exception $e) {
 
       drush_log("Failure: {$e->getMessage()}", 'error');

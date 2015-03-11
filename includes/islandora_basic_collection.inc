@@ -262,7 +262,7 @@ function drush_islandora_dss_islandora_collection_generate_derivatives_jpg($coll
 				 'Japanese Imperial House Postcard Album' => 'eastasia/imperial-postcards',
 				 
 				 'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
-				 //'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
+				 'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
 				 //'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
 
 				 // Create issue for this task
