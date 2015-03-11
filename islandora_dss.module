@@ -645,15 +645,16 @@ function islandora_dss_generate_islandora_path($subcollection, $member, $date = 
       } elseif($subcollection == 'Lafayette Newspaper Collection') {
 
 	//$alias = $solr_doc['dc.date.sort'];
-	$alias = $date;
+	//$alias = $date;
 
-	preg_match('/(\d{4}-\d{2}-\d{2})/', $alias, $m);
+	//preg_match('/(\d{4}-\d{2}-\d{2})/', $alias, $m);
+	preg_match('/(\d{4}-\d{2}-\d{2})/', $member->label, $m);
 	$alias = 'collections/newspaper/' . implode(explode('-', $m[1]));
       } else {
 
 	$alias = islandora_dss_get_alias_metadb($member, $subcollection);
       }
-
+      
       $path = array('source' => "islandora/object/{$member->id}",
 		    'alias' => $alias);
 
