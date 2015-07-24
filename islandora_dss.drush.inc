@@ -33,6 +33,7 @@ require_once dirname(__DIR__) . '/islandora_dss/includes/newspaper.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/islandora_solr.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/yohe.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/alumni.drush.inc';
+require_once dirname(__DIR__) . '/islandora_dss/includes/shakespeare.drush.inc';
 
 function islandora_dss_drush_command() {
 
@@ -244,6 +245,11 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 	  'description' => dt('Ingest thumbnails for any given Islandora Book Object'),
 	  'aliases' => array('book-ingest-tn'));
 
+  $items['islandora-book-derive-jpg-collection'] =
+    array(
+	  'description' => dt(''),
+	  'aliases' => array());
+
   $items['islandora-book-elc-ingest'] =
     array(
 	  'description' => dt(''),
@@ -371,6 +377,9 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 	  'aliases' => array());
   $items['islandora-metadb-metadata-export'] =
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
+	  'aliases' => array());
+  $items['islandora-metadb-items-offset'] =
+    array('description' => dt(''),
 	  'aliases' => array());
 
   /**
@@ -580,6 +589,11 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 	  'description' => dt(''),
 	  'aliases' => array('newspaper-ingest'));
 
+  $items['islandora-book-newspaper-append-mods-xml'] =
+    array(
+	  'description' => dt(''),
+	  'aliases' => array());
+
   /**
    * Sam S. Yohe Bushkill Stream Photo Albums tasks
    *
@@ -646,6 +660,16 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 	  'arguments' => array('arg1' => dt(''),
 			       'arg2' => dt(''),
 			       ),
+	  'aliases' => array());
+
+  /**
+   * Shakespeare Bulletin Archive Tasks
+   *
+   */
+  $items['islandora-book-shakespeare-ingest-collection'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array(),
 	  'aliases' => array());
 
   $items['islandora-book-generate-derivative-jpg-full'] =
@@ -745,17 +769,24 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 
   $items['islandora-solr-clean-dates'] =
     array(
-	  'description' => dt('Update the Solr index for any given collection'),
-	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
-			       'arg2' => dt('Fedora Generic Search user password')),
-	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
+	  'description' => dt(''),
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt('')),
+	  'examples' => array('Standard example' => ''),
 	  'aliases' => array(''));
 
   $items['islandora-solr-update-object'] =
-    array('description' => dt('Update the Solr index for any given collection'),
-	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
-			       'arg2' => dt('Fedora Generic Search user password')),
-	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
+    array('description' => dt(''),
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt('')),
+	  'examples' => array('Standard example' => ''),
+	  'aliases' => array(''));
+
+  $items['islandora-solr-add-document'] =
+    array('description' => dt(''),
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt('')),
+	  'examples' => array('Standard example' => ''),
 	  'aliases' => array(''));
 
   $items['islandora-solr-delete-object'] =
@@ -764,6 +795,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg2' => dt('Fedora Generic Search user password')),
 	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
 	  'aliases' => array(''));
+
+  $items['islandora-solr-find-unindexed'] =
+    array('description' => dt(''),
+	  'arguments' => array('arg1' => dt(''),
+			       ),
+	  'examples' => array('Standard example' => ''),
+	  'aliases' => array());
 
   return $items;
 }

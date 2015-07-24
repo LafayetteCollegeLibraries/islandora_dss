@@ -20,8 +20,9 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
   $session = new IslandoraSession($connection);
   $object = new IslandoraObject($session, $object_id);
 
-  $object->update_xml_element($ds_id, $xpath, $value,$namespace_prefix,
-						       $namespace_uri);
+  $object->update_xml_element($ds_id, $xpath, $value,
+			      $namespace_prefix,
+			      $namespace_uri);
 }
 
 /**

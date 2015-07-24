@@ -273,6 +273,76 @@ function drush_islandora_dss_islandora_solr_update_object($object_id, $user, $pa
   drush_log("Indexed " . $object_id . "...", 'success');
 }
 
+function drush_islandora_dss_islandora_solr_add_document($object_id,
+							 $xslt_file_path,
+							 $object_store_path = '/usr/local/fedora/data/objectStore',
+							 $datastream_store_path = '/usr/local/fedora/data/datastreamStore',
+							 $solr_host = 'localhost',
+							 $solr_core_context = 'solr/fedora') {
+
+  
+
+  $foxml_file_path = '';
+
+  $object_file_name = preg_replace('/\:/', '%3A', $object_id);
+
+  $object_store_dir = new RecursiveDirectoryIterator($object_store_path);
+  $object_store_iter = new RecursiveIteratorIterator($object_store_dir);
+
+  $foxml_files = new RegexIterator($object_store_iter, "/" . "info%3Afedora%2F" . $object_file_name . "$/i", RecursiveRegexIterator::GET_MATCH);
+
+  drush_log( dt('Searching for the FOXML file for !object_pid', array('!object_pid' => $object_id)), 'ok' );
+  foreach($foxml_files as $foxml_file_path => $_file) {
+
+    $solr_add_doc = shell_exec("/usr/bin/env xsltproc " . $xslt_file_path . " " . $foxml_file_path . " 2>/dev/null");
+    
+    // Add the ds.OBJ Datastream
+    
+    //$obj_datastream_path = "/mnt/smb/fedora/data/datastreamStore/e6/info%3Afedora%2Fshakespeare%3A3%2FOBJ%2FOBJ.0 -";
+    $datastream_store_dir = new RecursiveDirectoryIterator($datastream_store_path);
+    $datastream_store_iter = new RecursiveIteratorIterator($datastream_store_dir);
+
+    $pdf_files = new RegexIterator($datastream_store_iter, "/" . "info%3Afedora%2F" . $object_file_name . "%2FOBJ%2FOBJ.0$/i", RecursiveRegexIterator::GET_MATCH);
+
+    drush_log( dt('Searching for the OBJ datastream file for !object_pid', array('!object_pid' => $object_id)), 'ok' );
+    foreach($pdf_files as $obj_datastream_path => $_file) {
+
+      $pdf_text = shell_exec("/usr/bin/env pdftotext " . $obj_datastream_path . " -");
+      $pdf_text = preg_replace('/[\x00-\x1F\x7F]/', ' ', $pdf_text);
+    }
+
+    //$solr_doc = new DOMDocument();
+    //$solr_doc->loadXML($solr_add_doc);
+    $solr_doc = simplexml_load_string($solr_add_doc);
+
+    $doc_elements = $solr_doc->xpath('//add/doc');
+    $doc_element = $doc_elements[0];
+
+    //echo htmlentities($pdf_text);
+    //echo $pdf_text;
+    //exit(1);
+
+    $field = $doc_element->addChild('field', htmlspecialchars($pdf_text));
+    $field->addAttribute('name', 'ds.OBJ');
+
+    // Add the element
+    //echo $solr_doc->asXML();
+    //exit(1);
+
+    // POST with cURL
+    $ch = curl_init();
+
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: text/xml') );
+    curl_setopt($ch, CURLOPT_URL, "http://crete0.lafayette.edu:8080/solr/fedora/update?commit=true");
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $solr_doc->asXML() );
+
+    $result = curl_exec($ch);
+
+    curl_close($ch);
+  }
+}
+
 /**
  * For updating Solr Documents by collection
  * @param string $cdm_collection
@@ -286,4 +356,59 @@ function drush_islandora_dss_islandora_solr_delete_object($object_id, $user, $pa
   $index = new IslandoraSolrIndex($solr, $user, $pass, $fedoragsearch_url);
 
   $index->delete($object_id);
+}
+
+function drush_islandora_dss_islandora_solr_find_unindexed($collection_pid,
+							   $solr_host = 'localhost',
+							   $solr_core_context = 'solr/fedora/') {
+
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  // Retrieve all Member Objects for the Collection
+  $query = 'SELECT $object $title $content
+     FROM <#ri>
+     WHERE {
+            $object $collection_predicate <info:fedora/' . $collection_pid . '> ;
+                   <fedora-model:label> $title ;
+                   <fedora-model:hasModel> $content ;
+                   <fedora-model:state> <fedora-model:Active> .
+            FILTER(sameTerm($collection_predicate, <fedora-rels-ext:isMemberOfCollection>) || sameTerm($collection_predicate, <fedora-rels-ext:isMemberOf>))
+            FILTER (!sameTerm($content, <info:fedora/fedora-system:FedoraObject-3.0>))';
+
+  $query .= '} ORDER BY $title';
+  $query_array = array(
+		       'query' => $query,
+		       'type' => 'sparql',
+		       //'pid' => $obj_pid,
+		       // Seems as though this is ignored completely.
+		       'page_size' => $page_size,
+		       'page_number' => $page_number,
+		       );
+
+  $solr = new Apache_Solr_Service($solr_host, 8080, $solr_core_context);
+
+  foreach($connection->repository->ri->query($query_array['query'], $query_array['type']) as $result) {
+
+    $pid = $result['object']['value'];
+
+    $solr_query = "PID:\"$pid\"";
+
+
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID dc.title'));
+    $solr_results = json_decode($results->getRawResponse(), TRUE);
+
+    $solr_docs = $solr_results['response']['docs'];
+
+    if(empty($solr_docs)) {
+
+      drush_log(dt('The Islandora Object !object_pid has not been indexed by Apache Solr', array('!object_pid' => $pid)), 'warning');
+    } else {
+
+      $solr_doc = array_shift($solr_docs);
+      $dc_title = $solr_doc['dc.title'];
+
+      //drush_log(dt('The Islandora Object !object_pid has been indexed by Apache Solr with the title "!dc_title"', array('!object_pid' => $pid, '!dc_title' => $dc_title)), 'ok');
+    }
+  }
+    
 }

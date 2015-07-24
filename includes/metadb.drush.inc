@@ -19,6 +19,9 @@ function drush_islandora_dss_islandora_metadb_mods_ingest($project_name, $item_i
   $mods_factory = new MetaDbModsFactory('127.0.0.1');
   $mods_doc = $mods_factory->get_doc($project_name, $item_id);
 
+  print (string) $mods_doc;
+  exit(1);
+
   if(is_null($object_id)) {
 
     $path_item_id = $item_id;
@@ -367,4 +370,44 @@ function drush_islandora_dss_islandora_metadb_metadata_export($file_path,
   }
 
   fclose($fp);
+}
+
+/**
+ * Increment/decrement the Fedora Commons label and MetaDB Item ID by an arbitrary constant
+ *
+ */
+function drush_islandora_dss_islandora_metadb_items_offset($init, $term, $collection_name, $offset = 1,
+							   $solr_host = 'localhost',
+							   $solr_path = 'solr/fedora') {
+
+  $offset = intval($offset);
+  $connection = islandora_get_tuque_connection(user_load(1));
+  $solr = new Apache_Solr_Service($solr_host, 8080, $solr_path . '/');
+  $index = new IslandoraSolrIndex($solr);
+
+  foreach( array($init, $term) as $dc_title_query ) {
+  $solr_query = "dc.title:\[$dc_title_query*";
+
+  $solr_results = $index->search($solr_query, array('fl' => 'PID', 'sort' => 'dc.title asc'));
+
+  if(empty($solr_results['response']['docs'])) {
+	  
+    drush_log(dt('Could not find any Objects bearing the MetaDB ID %metadb_id', array('%metadb_id' => $dc_title_query)), 'warning');
+  } elseif(count($solr_results['response']['docs']) > 1) {
+
+    drush_log(dt('Found duplicate Objects bearing the MetaDB ID %metadb_id', array('%metadb_id' => $dc_title_query)), 'warning');
+  } else {
+
+    foreach($solr_results['response']['docs'] as $solr_doc) {
+
+      //print_r($solr_doc);
+
+      $object = islandora_object_load( $solr_doc['PID'] );
+
+      print_r($object);
+    }
+  }
+  }
+
+  drush_log(dt('trace'), 'ok');
 }

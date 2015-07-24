@@ -199,7 +199,7 @@ function drush_islandora_dss_islandora_book_derive_tn_collection($collection_pid
   }
 }
 
-function drush_islandora_dss_islandora_book_ingest_tn($book_pid, $derivative_file) {
+function drush_islandora_dss_islandora_book_ingest_tn($book_pid, $derivative_file, $mimetype = 'image/jpeg', $label = NULL) {
 
   //module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
   $tuque = islandora_get_tuque_connection(user_load(1));
@@ -225,16 +225,27 @@ function drush_islandora_dss_islandora_book_ingest_tn($book_pid, $derivative_fil
     $ds = $object->constructDatastream($dsid, 'M');
     $ds->label = $label;
     $ds->mimeType = $mimetype;
-  }
 
-  $ds->setContentFromFile($file);
-  try {
-    $object->ingestDatastream($ds);
-  } catch (exception $e) {
-    drupal_set_message(t('@message', array('@message' => check_plain($e->getMessage()))), 'error');
+    $ds->setContentFromFile($file);
 
-    //fclose($file);
-    return FALSE;
+    try {
+
+      $object->ingestDatastream($ds);
+    } catch (exception $e) {
+      drupal_set_message(t('@message', array('@message' => check_plain($e->getMessage()))), 'error');
+
+      //fclose($file);
+      return FALSE;
+    }
+  } else {
+
+    if( !is_null($label) ) {
+
+      $ds->label = $label;
+    }
+
+    $ds->mimeType = $mimetype;
+    $ds->setContentFromFile($file);
   }
 
   //fclose($file);
@@ -260,6 +271,49 @@ function drush_islandora_dss_islandora_book_compare_derivatives($book_pid) {
     print_r(IslandoraImageDatastream::compare($page->master, $page->derivatives['JPG']));
     print_r(IslandoraImageDatastream::compare($page->master, $page->derivatives['TN']));
   }
+}
+
+function drush_islandora_dss_islandora_book_ingest($file_path, $label, $collection_pid = 'islandora:root', $namespace = 'islandora') {
+
+  // Get the connection
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  module_load_include('inc', 'islandora_pdf', 'includes/derivatives');
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  $file = new stdClass();
+
+  $uri = "$file_path";
+  $uri = file_stream_wrapper_uri_normalize($uri);
+
+  $file->uri = $uri;
+  $file->filename = $filename;
+
+  $collections = array($collection_pid);
+
+  // ID is more specific than namespace so it will take precedence.
+  $id = isset($namespace) ? $namespace : 'islandora';
+
+  $relationship_map = function($o) {
+
+    return array('relationship' => 'isMemberOfCollection', 'pid' => $o);
+  };
+  $relationships = array_map($relationship_map, $collections);
+
+  drush_log(t("Ingesting a new Book Object for $label..."), 'ok');
+  
+  $object = islandora_prepare_new_object($id, $label, array(), array('islandora:bookCModel'), $relationships);
+  islandora_add_object($object);
+  drush_log(t("Ingested $label into the Book Object {$object->id}"), 'success');
+
+  $page_pid = $id;
+  drush_log("Ingesting {$file->uri} and appending it to $book_pid...", 'ok');
+  islandora_dss_book_page_ingest($file, $book_pid, $label, $page_pid);
+
+  drush_log(t("Generating the thumbnail for {$object->id}..."), 'ok');
+  islandora_paged_content_update_paged_content_thumbnail($object);
+  drush_log(t("Generated the thumbnail for {$object->id}"), 'success');
 }
 
 /**
@@ -387,15 +441,59 @@ function drush_islandora_dss_islandora_book_lebanesetown_ingest($dir_path, $star
   drush_log(t("Generated the thumbnail for {$lebanese_scan->id}"), 'success');
 }
 
-
 /**
  * Drush task for generating large JPEG derivatives
  *
  *
  */
+
+/**
+ *
+ */
 function drush_islandora_dss_islandora_book_generate_derivative_jpg_full($pid, $collection_name) {
 
   islandora_dss_generate_derivative_jpg_full_book($pid, $collection_name);
+}
+
+/**
+ *
+ */
+function drush_islandora_dss_islandora_book_derive_jpg_collection($collection_name, $min = 0,
+								  $solr_host_fqdn = 'localhost', $solr_host_port = 8080, $solr_host_path = '/solr/fedora'
+								  ) {
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+
+  $solr = new Apache_Solr_Service($solr_host_fqdn, $solr_host_port, $solr_host_path);
+
+  $solr_query = "cdm.Relation.IsPartOf:\"" . $collection_name . "\"";
+  $params = array('fl' => 'dc.title PID', 'sort' => 'dc.title asc');
+  $solr_results = $solr->search($solr_query, 0, 1000000, $params);
+
+  $results = json_decode($solr_results->getRawResponse(), TRUE);
+  $response = $results['response'];
+
+  $docs = $response['docs'];
+
+  foreach($docs as $doc) {
+
+    $dc_title = $doc['dc.title'];
+    $pid = $doc['PID'];
+
+    if( preg_match('/(\d+)\]/', $dc_title, $m) ) {
+
+      $object_number = intval($m[1]);
+
+      echo $object_number . "\n";
+      
+      if( $object_number < intval($min) ) {
+
+	continue;
+      }
+
+      islandora_dss_generate_derivative_jpg_full_book($pid, $collection_name);
+    }
+  }
 }
 
 function drush_islandora_dss_islandora_large_image_generate_derivative_jpg_full($pid, $collection_name, $is_back = FALSE, $delete_layers = FALSE, $regenerate = FALSE) {
@@ -413,3 +511,4 @@ function drush_islandora_dss_islandora_large_image_generate_derivative_jpg_full(
   islandora_dss_generate_derivative_jpg_full_large_image($pid, $connection, $collection_name, $path_alias,
 							 $is_back, $delete_layers, $regenerate);
 }
+

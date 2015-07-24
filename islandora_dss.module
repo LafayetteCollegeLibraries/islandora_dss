@@ -372,9 +372,9 @@ function islandora_dss_get_alias_metadb($object, $coll_pid=NULL, $path_base='col
 
     $coll_pid = array_shift($object->getParents());
 
-  $EASTASIA_PID_MAP = array('islandora:eastAsia' => 'eastasia',
-			    'eastAsia:rjwStereo' => 'eastasia/rjw-stereo',
-			    'eastAsia:imperialPostcards' => 'eastasia/imperial-postcards',
+    $EASTASIA_PID_MAP = array('islandora:eastAsia' => 'eastasia',
+			      'eastAsia:rjwStereo' => 'eastasia/rjw-stereo',
+			      'eastAsia:imperialPostcards' => 'eastasia/imperial-postcards',
 			    
 			    //'eastAsia:postcardAlbums' => 'postcard-albums',
 				
@@ -906,18 +906,14 @@ function islandora_dss_get_metadb_file_path($object, $is_back = FALSE) {
   }
 
   $metadb_id = preg_replace('/0(\d{4})$/', '\1', $metadb_id);
-
-  // /mnt/imago1/master/MetaDB/imperial-postcards/lc-spcol-imperial-postcards-0001.tif
   preg_match('/(.+?)\-\d{4}/', $metadb_id, $m);
   $subdir = $m[1];
 
   if($is_back and array_key_exists($subdir, $EAIC_SECONDARY_DIR_MAP)) {
 
-    //return array_shift(glob('/mnt/imago1/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/*' . $metadb_id . '*'));
     return array_shift(glob('/mnt/smb/images/projects/master/other/' . $EAIC_SECONDARY_DIR_MAP[$subdir] . '/*' . $metadb_id . '*'));
   }
 
-  //return '/mnt/imago1/master/MetaDB/' . "$subdir/" . 'lc-spcol-' . $metadb_id . '.tif';
   return '/mnt/smb/images/projects/master/MetaDB/' . "$subdir/" . 'lc-spcol-' . $metadb_id . '.tif';
 }
 
@@ -1037,6 +1033,9 @@ function islandora_dss_generate_derivative_jpg_book($pid, $connection, $collecti
  */
 function islandora_dss_generate_derivative_jpg_full_book($pid, $collection_name = '') {
 
+  // islandora_paged_content/includes/utilities.inc
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
   $connection = islandora_get_tuque_connection(user_load(1));
   $object = $connection->repository->getObject(urldecode($pid));
 
@@ -1045,7 +1044,7 @@ function islandora_dss_generate_derivative_jpg_full_book($pid, $collection_name 
     $collection_name = array_shift(islandora_dss_get_cdm_collections($object));
   }
 
-  $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");
+  $path_alias = drupal_get_path_alias("islandora/object/{$object->id}");  
 
   // Retrieve the Page Objects for the Book
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
@@ -1064,6 +1063,7 @@ function islandora_dss_generate_derivative_jpg_full_book($pid, $collection_name 
   } else {
 
     $is_back = FALSE;
+
     foreach($page_pids as $page_pid) {
 
       islandora_dss_generate_derivative_jpg_full_large_image($page_pid, $connection, $collection_name, $path_alias, $is_back);
@@ -1116,20 +1116,6 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
   module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
 
   // Apparently, the TIFF wasn't ingested for Page Objects
-
-  /*
-  if(!$object['OBJ']) {
-
-    $parent = islandora_object_load(array_pop($object->getParents()));
-    $metadb_file_path = islandora_dss_get_metadb_file_path($parent, $is_back);
-
-    drush_log("Ingesting $metadb_file_path into the OBJ datastream for for {$object->id}...", 'ok');
-
-    islandora_large_image_add_datastream($object, 'OBJ', $metadb_file_path, 'image/tiff', t('Lossless TIFF'));
-  }
-  */
-
-  //$tiff_file = file_save_data($object['OBJ']->content, "temporary://{$base_name}_OBJ.tiff");
 
   $obj_ds = $object['OBJ'];
   if(!$obj_ds) {
@@ -1270,10 +1256,10 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
  *
  */
 function islandora_dss_generate_derivative_jpg_full_large_image($pid, $connection = NULL, $collection_name = NULL, $path_alias = NULL,
-								$is_back = FALSE, $delete_layers = FALSE, $regenerate = FALSE) {
+								$is_back = FALSE, $delete_layers = FALSE, $regenerate = TRUE) {
 
   $result = islandora_dss_generate_derivative_jpg_large_image($pid, $connection, $collection_name, $path_alias,
-							      $is_back, $delete_layers, FALSE, $regenerate, 'JPG-FULL', 'Fully Sized JPEG');
+							      $is_back, $delete_layers, FALSE, $regenerate, 'JPG', 'Fully Sized JPEG');
 
   return $result;
 }
@@ -1304,36 +1290,25 @@ function islandora_dss_book_derive($object) {
  * @see islandora_book_upload_page_form_submit()
  * @see islandora_prepare_new_object()
  */
-function islandora_dss_book_page_ingest($file, $book_pid, $label = NULL, $page_pid = NULL, $language = 'en-US') {
+function islandora_dss_book_page_ingest($file, $book_pid, $label = '', $page_pid = 'islandora', $language = 'en-US') {
+
+  $filename = property_exists($file, 'filename') ? $file->filename : $file;
+
+  // Work-around
+  // @todo Refactor
+  $label = is_null($label) or empty($label) ? $filename : $label;
 
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
 
   $tuque = islandora_get_tuque_connection(user_load(1));
 
-  if(isset($page_pid)) {
-
-    $object = $tuque->repository->constructObject($page_pid);
-  } else {
-
-    // The namespace is retrieved from the PID passed as a parameter to the constructObject() method
-    $object = $tuque->repository->constructObject('islandora');
-  }
-
-  if(isset($label)) {
-
-    $object->label = $label;
-  } else {
-
-    $filename = property_exists($file, 'filename') ? $file->filename : $file;
-    $object->label = $filename;
-  }
+  $object = $tuque->repository->constructObject($page_pid);
+  $object->label = $label;
 
   // Refactor and move into islandora_dss.drush.inc...
   drush_log("Ingesting the Object {$object->id}...", 'ok');
 
   islandora_paged_content_update_datastream($object, drupal_realpath(property_exists($file, 'uri') ? $file->uri : $file ), 'OBJ', NULL, NULL, 'M', FALSE);
-
-  property_exists($file, 'uri');
 
   // Update RELS-EXT properties, page/sequence/etc, and append the page at the
   // end of the book.
@@ -1717,7 +1692,7 @@ function islandora_dss_get_session($user = NULL, $url = NULL, $user_string = NUL
 
     try {
 
-      $session = new IslandoraSession(islandora_get_tuque_connection($user, $url, $user_string, $pass_string), $fgs_user, $fgs_pass);
+      $session = new IslandoraSession(islandora_get_tuque_connection($user, $url, $user_string, $pass_string), $solr_url, $fgs_user, $fgs_pass);
     } catch (Exception $e) {
 
       drupal_set_message(t('Unable to establish an Islandora Session: %error', array('%error' => $e)), 'error');

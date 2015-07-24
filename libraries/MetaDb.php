@@ -10,7 +10,8 @@
 
 class MetaDbModsFactory {
 
-  public static $METADB_PROJECT_NAMES = array('imperial-postcards' => 'east-asia');
+  public static $METADB_PROJECT_NAMES = array('imperial-postcards' => 'east-asia',
+					      'warner-negs-taiwan' => 'east-asia');
 
   /**
    * Static method for generating the Class name from the MetaDB Project name

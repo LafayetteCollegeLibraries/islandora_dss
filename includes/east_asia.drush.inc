@@ -15,7 +15,8 @@ $module_path = drupal_get_path('module', 'islandora_dss');
  *
  */
 function drush_islandora_dss_islandora_east_asia_mods_export($object_pid,
-							     $project_name, $item_id) {
+							     $project_name,
+							     $item_id) {
 
   $tuque = islandora_get_tuque_connection(user_load(1));
   $object = islandora_object_load($object_pid);
@@ -33,7 +34,7 @@ function drush_islandora_dss_islandora_east_asia_mods_export($object_pid,
 
   print $mods_doc->to_csv();
   
-  }
+}
 
 /**
  * Export a MetaDB Items from the East Asia Image Collection into Islandora
@@ -41,6 +42,9 @@ function drush_islandora_dss_islandora_east_asia_mods_export($object_pid,
  */
 function drush_islandora_dss_islandora_east_asia_mods_export_collection($collection_name,
 									$project_name,
+									$solr_host = 'localhost',
+									$solr_port = 8080,
+									$solr_path = 'solr/fedora',
 									$file_path = NULL) {
 
   $tuque = islandora_get_tuque_connection(user_load(1));
@@ -48,11 +52,11 @@ function drush_islandora_dss_islandora_east_asia_mods_export_collection($collect
   $project = new DssMetaDbProject($project_name);
   $records = new DssMetaDbRecordSet($project);
 
-  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');  
+  $solr = new Apache_Solr_Service($solr_host, $solr_port, $solr_path . '/');
   $index = new IslandoraSolrIndex($solr);
 
   $solr_query = "cdm.Relation.IsPartOf:\"$collection_name\"";
-  $solr_results = $index->search($solr_query, array('fl' => 'PID dc.title'));
+  $solr_results = $index->search($solr_query, array('fl' => 'PID dc.title', 'sort' => 'dc.title asc'));
 
   foreach($solr_results['response']['docs'] as $solr_doc) {
 
@@ -80,13 +84,21 @@ function drush_islandora_dss_islandora_east_asia_mods_export_collection($collect
   }
 }
 
+function drush_islandora_dss_east_asia_reorder($collection_name,
+					       $project_name,
+					       $file_path = NULL) {
+  
+  //
+  
+}
+
 /**
  * Task for ingesting East Asia Image Collection digital surrogates into Islandora Book Objects
  *
  * @see islandora_ingest_form_prepare_new_object()
  *
  */
-function drush_islandora_dss_islandora_east_asia_ingest($file_path, $label, $collection, $book_pid = NULL) {
+function drush_islandora_dss_islandora_east_asia_ingest($front_file_path, $label, $collection, $back_file_path = NULL, $book_pid = NULL) {
 
   $segments = preg_split('/\-/', $collection);
 
@@ -103,7 +115,7 @@ function drush_islandora_dss_islandora_east_asia_ingest($file_path, $label, $col
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
 
   // Abstract and refactor
-  if(!isset($book_pid)) {
+  if(is_null($book_pid)) {
 
     // ID is more specific than namespace so it will take precedence.
     $id = isset($namespace) ? $namespace : 'islandora';
@@ -122,39 +134,17 @@ function drush_islandora_dss_islandora_east_asia_ingest($file_path, $label, $col
     $book_pid = $east_asia_postcard->id;
   }
 
-  // /mnt/smb/images/projects/master/MetaDB/imperial-postcards
-
-  /*
-  $ledger_files = file_scan_directory($dir_path, '/\.tif/');
-  sort($ledger_files);
-  foreach($ledger_files as $key => $file) {
-
-    if(!isset($start) or $key >= $start) {
-
-      $file_name = basename($file->uri);
-
-      /*
-      if(!preg_match('/(ELCv\d)_(.+?)\.tif/', $file_name, $m)) {
-
-	drush_log('Could not parse the file name for ' . $file_name, 'warning');
-	continue;
-      } else {
-
-	$page_pid = $namespace;
-	drush_log("Ingesting {$file->uri} and appending it to $book_pid...", 'ok');
-	islandora_dss_book_page_ingest($file, $book_pid, $file_name, $page_pid);
-      }
-      * /
-
-    }
-  }
-  */
-
   $page_pid = $namespace;
-  drush_log("Ingesting {$file_path} and appending it to $book_pid...", 'ok');
+  drush_log("Ingesting {$front_file_path} and appending it to $book_pid...", 'ok');
 
-  $file = (object) array('uri' => $file_path);
-  islandora_dss_book_page_ingest($file, $book_pid, $label, $page_pid);
+  $front_file = (object) array('uri' => $front_file_path);
+  islandora_dss_book_page_ingest($front_file, $book_pid, $label, $page_pid);
+
+  if(!is_null($back_file_path)) {
+
+    $back_file = (object) array('uri' => $back_file_path);
+    islandora_dss_book_page_ingest($back_file, $book_pid, $label, $page_pid);
+  }
 
   drush_log(t("Generating the thumbnail for {$east_asia_postcard->id}..."), 'ok');
   islandora_paged_content_update_paged_content_thumbnail($east_asia_postcard);
@@ -208,9 +198,6 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
 
   $mods_doc = $factory->get_doc($project_name, $item_id);
 
-  // <note type="admin">East Asia Image Collection</note>
-  // <note type="admin">Imperial Postcard Collection</note>
-
   //$this->doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
 
   $results = $mods_doc->doc->xpath('/mods:mods/mods:note[@type="admin"]');
@@ -220,18 +207,6 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
     $mods_doc->set_collection( 'East Asia Image Collection' );
     $mods_doc->set_collection( $collection );
   }
-
-  //$note = $mods_doc->doc->addChild('note', 'East Asia Image Collection');
-  //$note->addAttribute('type', 'admin');
-
-  /*
-  $doc = new DomDocument('1.0');
-  $doc->preserveWhiteSpace = false;
-  $doc->formatOutput = true;
-  $doc->loadXML( (string) $mods_doc );
-  print $doc->saveXML();
-  exit(1);
-  */
 
   // Resolves DSSSM-1060
   foreach($incomplete_metadata_objects as $field_value => $pids) {
@@ -256,14 +231,10 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
     }
   }
 
-  //$mods_doc->validate();
-
   $doc = new DomDocument('1.0');
   $doc->preserveWhiteSpace = false;
   $doc->formatOutput = true;
   $doc->loadXML( (string) $mods_doc );
-  print $doc->saveXML();
-  //exit(1);
 
   $item_num = $item_id;
   $file_path = $dir_path . '/mnt/smb/images/projects/master/MetaDB/' . $project_name . '/lc-spcol-' . $project_name . '-' . $item_num . '.tif';
@@ -277,14 +248,6 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
       $label = (string) $title;
     }
   }
-
-  /*
-  $labels = array_filter((array) $mods_doc->doc->titleInfo->title, function($title) {
-
-      $title_value = (string) $title;
-      return preg_match('/^\[/', $title_value);
-    });
-  */
 
   if( !isset( $east_asia_postcard ) ) {
 

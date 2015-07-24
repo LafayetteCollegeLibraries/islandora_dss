@@ -102,9 +102,9 @@ class IslandoraSolrIndex {
     // @todo Ensure that Solr receives a "commit" after updating the Fedora Generic Search index
   }
 
-  function search($solr_query, $params = array('fl' => 'PID', 'sort' => 'dc.title asc')) {
+  function search($solr_query, $params = array('fl' => 'PID', 'sort' => 'dc.title asc'), $start = 0, $rows = 1000000) {
 
-    $solr_results = $this->solr->search($solr_query, 0, 1000000, $params);
+    $solr_results = $this->solr->search($solr_query, $start, $rows, $params);
 
     return json_decode($solr_results->getRawResponse(), TRUE);
   }
@@ -254,6 +254,7 @@ class IslandoraObject implements Serializable {
       $xml_str = preg_replace("/<$xpath>(.+?)<\/$xpath>/", "<$xpath>$value</$xpath>", $ds->content);
       $ds->setContentFromString($xml_str);
     } else {
+#    if(true) {
 
       //$ds_doc = new SimpleXmlElement($ds->content);
       $dc_doc = new DOMDocument();
