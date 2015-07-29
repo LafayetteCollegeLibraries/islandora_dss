@@ -199,6 +199,168 @@ function drush_islandora_dss_islandora_book_derive_tn_collection($collection_pid
   }
 }
 
+/**
+ * Drush task for relating a Page Object to a given Book Object
+ *
+ */
+function drush_islandora_dss_islandora_page_insert($book_pid, $page_pid) {
+
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+  module_load_include('inc', 'islandora_dss', 'includes/derivatives');
+
+  // Get the connection
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $book = islandora_object_load($book_pid);
+  $page = islandora_object_load($page_pid);
+
+  $rels_ext = $page->relationships;
+  $pages = islandora_paged_content_get_pages($book);
+
+  $language = 'en-US';
+  $num_pages = count($pages) + 1;
+
+  $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
+  $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
+  $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
+  $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
+  $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
+  $rels_ext->add(FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
+  $rels_ext->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
+
+  drush_log(dt('Successfully linked the Islandora Page Object !page_id to the Islandora Book Object !book_id', array('!page_id' => $page->id,
+														     '!book_id' => $book->id)), 'success');
+}
+
+/**
+ * Drush task for ingesting TIFF files into the OBJ Datastream for Page Objects
+ *
+ */
+/**
+ * Ingest a Page Object for a Book Object
+ *
+ */
+function drush_islandora_dss_islandora_page_ingest($book_pid, $page_pid = '', $file_path = NULL, $namespace = 'islandora') {
+
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+  module_load_include('inc', 'islandora_dss', 'includes/derivatives');
+
+  // Retrieve the SIP
+  //$file = file_load($file_path);
+
+  // Get the connection
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $object = islandora_object_load($book_pid);
+
+  if(is_null($file_path)) {
+
+    echo 'trace';
+    exit(1);
+  } elseif(empty($page_pid)) {
+
+    $page_pid = $connection->repository->api->m->getNextPid($namespace);
+
+    if(preg_match('/.*\/(.+\.tif?)/', $file_path, $m)) {
+
+      $page_label = $m[1];
+    } else {
+
+      drush_log(dt('Failed to parse the Islandora Page Object Label for !object_id', array('!object_pid' => $file_path) ), 'error');
+      exit(1);      
+    }
+
+    //echo $page_label;
+    //exit(1);
+
+    $page = $connection->repository->constructObject($page_pid);
+
+    $page->owner = 'fedoraAdmin';
+    $page->label = $page_label;
+    $page->models = 'islandora:bookCModel';
+
+    $obj_ds = $page->constructDatastream('OBJ', 'M');
+    $obj_ds->setContentFromFile($file_path);
+    $obj_ds->mimetype = 'image/tiff';
+    $page->ingestDatastream($obj_ds);
+
+    // Update RELS-EXT properties, page/sequence/etc, and append the page at the
+    // end of the book.
+    $rels_ext = $page->relationships;
+    //$language = $book->language;
+    $language = 'en-US';
+
+    $book = $object;
+    $pages = islandora_paged_content_get_pages($book);
+
+    $num_pages = count($pages) + 1;
+
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
+    islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
+    islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
+
+    $connection->repository->ingestObject($page);
+
+    drush_log(dt('Successfully ingested !file_path into to Islandora Page Object !object_id', array('!file_path' => $file_path,
+												    '!object_pid' => $page->id)), 'success');
+    exit(1);
+  } else {
+
+    $page = islandora_object_load($page_pid);
+  }
+
+  if(is_null($file_path)) {
+
+    if(!preg_match('/\[([a-z]+)(\d+?)\]/', $object->label, $metadb_id_match)) {
+
+      drush_log(dt('Failed to parse the Islandora Book Label for !object_id', array('!object_pid' => $object->id) ), 'error');
+      exit(1);
+    }
+
+    $metadb_projects_map = array('tj' => 'tjwar-postcards');
+    $metadb_project = $metadb_projects_map[ $metadb_id_match[1] ];
+
+    // /mnt/smb/images/projects/master/MetaDB/tjwar-postcards/lc-spcol-tjwar-postcards-0001.tif    
+    $file_path = "/mnt/smb/images/projects/master/MetaDB/$metadb_project/lc-spcol-$metadb_project-$metadb_id_match[2].tif";
+  }
+
+  if(!$page['OBJ'] or strlen($page['OBJ']->content) == 0) {
+
+    $page['OBJ']->setContentFromFile($file_path);
+    drush_log(dt('Successfully ingested !file_path into to Islandora Page Object !object_id', array('!file_path' => $file_path,
+												    '!object_pid' => $page->id)), 'success');
+  }
+
+  /*
+  */
+
+  $base_name = str_replace(':', '-', $object->id);
+
+  // Explicitly set the datastream for the JPEG2000
+  // This results in a series of errors
+  //$derivative_file = islandora_large_image_create_JP2_derivative($object, $file_path, $base_name);
+
+  $jp2_file_path = "temporary://{$base_name}_JP2.jp2";
+
+  // Objects are mutable
+  drush_islandora_dss_generate_image_ds($object, $file_path,
+					array('-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75)),
+					      '-resize ' . escapeshellarg("200 x 200")), 'TN', 'Thumbnail');
+
+  drush_islandora_dss_generate_image_ds($object, $file_path,
+					array('-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75)),
+					      '-resize ' . escapeshellarg("600 x 800")), 'JPG', 'Medium sized JPEG');
+  drush_islandora_dss_generate_image_ds($object, $file_path, islandora_large_image_get_args(), 'JP2', 'JPEG 2000');
+}
+
 function drush_islandora_dss_islandora_book_ingest_tn($book_pid, $derivative_file, $mimetype = 'image/jpeg', $label = NULL) {
 
   //module_load_include('inc', 'islandora_paged_content', 'includes/utilities');

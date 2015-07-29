@@ -9,6 +9,90 @@
 $module_path = drupal_get_path('module', 'islandora_dss');
 require_once "$module_path/libraries/Islandora.php";
 
+function drush_islandora_dss_islandora_book_shakespeare_generate_path_aliases($csv_file_path, $solr_url = 'http://localhost:8080/solr/fedora', $file = NULL) {
+
+  // Get the connection
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $row = 0;
+  if(($csv_file = fopen($csv_file_path, "r")) !== FALSE) {
+
+    while(($data = fgetcsv($csv_file, 1000, ",")) !== FALSE) {
+
+      $row++;
+      if($row == 1) {
+
+	continue;
+      }
+
+      if(!is_null($file) and $file != $data[0]) {
+
+	continue;
+      }
+
+      $book_label = $data[0];
+      $session = new IslandoraSession($connection, $solr_url);
+      $books = $session->get_objects($book_label);
+
+      if($book_label == 'lafalummag_19660900X') {
+
+	$book = islandora_object_load('alumni:784');
+	$books = array($book);
+      }
+
+      if(empty($books)) {
+
+	// Attempt to query Solr for the Object
+	drush_log(dt('Searching for Object !sequence_number within the sequence', array('!sequence_number' => $data[21])), 'ok');
+
+	$solr_results = $session->index->search('MODS.mods.identifier.local_i:"' . $data[21] . '"');
+	//$solr_results = $session->index->search('MODS.mods.identifier.local_i:"' . $data[21] . '" AND cdm.Relation.IsPartOf:"Alumni Publications"');
+	$solr_response = $solr_results['response'];
+
+	if(empty($solr_response['docs'])) {
+
+	  drush_log(dt('No Object could be found bearing the label !label', array('!label' => $book_label)), 'warning');
+	  //exit(1);
+	} else {
+
+	  if(count($solr_response['docs']) > 1) {
+
+	    drush_log(dt('Duplicate Objects found bearing the label !label', array('!label' => $book_label)), 'warning');
+	  }
+
+	  $doc = array_shift($solr_response['docs']);
+	  $book = islandora_object_load($doc['PID']);
+	  $books = array($book);
+	}
+      }
+
+      $book = array_shift($books);
+
+      if(!preg_match('/_(\d+[A-Z]?)/', $book_label, $book_label_m)) {
+
+	print $book_label;
+	exit(1);
+      }
+
+      $alias_segment = str_replace('_', '-', $book_label);
+      $source = 'islandora/object/' . $book->id;
+      $alias = 'collections/magazine/' . $alias_segment;
+      $path = array('source' => $source,
+		    'alias' => $alias);
+
+      path_save($path);
+      drush_log(dt('Successfully generate the path alias !alias for !source', array('!alias' => $alias, '!source' => $source)), 'success');
+    }
+  }
+
+  $source = 'islandora/search/*:*?f[0]=cdm.Relation.IsPartOf:"Lafayette Magazine Collection"';
+  $alias = 'collections/magazine/browse';
+  $path = array('source' => $source,
+		'alias' => $alias);
+  path_save($path);
+  drush_log(dt('Successfully generate the path alias !alias for !source', array('!alias' => $alias, '!source' => $source)), 'success');
+}
+
 function drush_islandora_dss_islandora_book_shakespeare_ingest_collection($tiff_dir_path,
 									  $pdf_dir_path,
 									  $csv_file_path,

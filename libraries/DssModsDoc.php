@@ -1263,7 +1263,10 @@ class EastAsiaModsDoc extends DssModsDoc {
    *
    */
   public static $field_element_map = array(
-					   //'contributor' => array(),
+					   'contributor.donor' => array(
+									'name' => 'note',
+									'attributes' => array('type' => 'acquisition')
+									),
 					   //'coverage.location' => array(),
 					   //'coverage.location.country' => array(),
 					   //'creator.company' => array(),

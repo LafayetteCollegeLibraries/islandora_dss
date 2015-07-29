@@ -93,6 +93,17 @@ function drush_islandora_dss_east_asia_reorder($collection_name,
 }
 
 /**
+ * Task for generating path aliases for the tjwar-postcards Collection
+ * This likely duplicates functionality
+ * @todo Refactor
+ *
+ */
+function drush_islandora_dss_islandora_tjwar_path_alias() {
+
+  
+}
+
+/**
  * Task for ingesting East Asia Image Collection digital surrogates into Islandora Book Objects
  *
  * @see islandora_ingest_form_prepare_new_object()
@@ -155,6 +166,44 @@ function drush_islandora_dss_islandora_east_asia_ingest($front_file_path, $label
 }
 
 /**
+ *
+ * 
+ *
+ */
+function drush_islandora_dss_islandora_east_asia_migrate_project($project_name, $pg_host = 'localhost', $start = NULL, $max = NULL) {
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+
+  $project_name_collection_map = array(
+				       'imperial-postcards' => 'Imperial Postcard Collection',
+				       'tjwar-postcards' => 'Taroko-Japan War'
+				       );
+  $collection = $project_name_collection_map[$project_name];
+
+  $pg_user = 'metadb';
+  $pg_password = 'secret';
+  $pg_port = 5432;
+  $pg_dbname = 'metadb';
+  $pg = new PDO("pgsql:host=$pg_host;port=" . (string) $pg_port . ";dbname=$pg_dbname;", $pg_user, $pg_password);
+
+  $sql = "select item_number,fullsize_file_name from items where project_name='$project_name'";
+
+  if(!is_null($max)) {
+
+    $subset = range((int) $start, (int) $max);
+  }
+
+  foreach($pg->query($sql) as $row) {
+    
+    $item_number = $row['item_number'];
+    if(!isset($subset) or in_array((int) $item_number, $subset)) {
+
+      drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $item_number, $pg_host);
+    }
+  }
+}
+
+/**
  * Migrate a MetaDB Item from the East Asia Image Collection into Islandora
  *
  */
@@ -184,7 +233,10 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
 
   $factory = new MetaDbModsFactory($pg_host);
 
-  $project_name_collection_map = array('imperial-postcards' => 'Imperial Postcard Collection');
+  $project_name_collection_map = array(
+				       'imperial-postcards' => 'Imperial Postcard Collection',
+				       'tjwar-postcards' => 'Taroko-Japan War'
+				       );
   $collection = $project_name_collection_map[$project_name];
 
   if( !is_null($book_pid) ) {
@@ -236,7 +288,18 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
   $doc->formatOutput = true;
   $doc->loadXML( (string) $mods_doc );
 
-  $item_num = $item_id;
+  /**
+   * Extended handling for multiple file naming schemes across different MetaDB Projects
+   *
+   */
+  if($project_name == 'tjwar-postcards') {
+
+    $item_num = '00' . $item_id;
+  } else {
+
+    $item_num = $item_id;
+  }
+
   $file_path = $dir_path . '/mnt/smb/images/projects/master/MetaDB/' . $project_name . '/lc-spcol-' . $project_name . '-' . $item_num . '.tif';
 
   foreach($mods_doc->doc->titleInfo->title as $title) {
@@ -252,6 +315,17 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
   if( !isset( $east_asia_postcard ) ) {
 
     $east_asia_postcard = drush_islandora_dss_islandora_east_asia_ingest($file_path, $label, $project_name);
+
+    /*
+    $page_pid = $namespace;
+    drush_log("Ingesting {$front_file_path} and appending it to $book_pid...", 'ok');
+
+    if(!is_null($back_file_path)) {
+
+      $back_file = (object) array('uri' => $back_file_path);
+      islandora_dss_book_page_ingest($back_file, $book_pid, $label, $page_pid);
+    }
+    */
   }
 
   $ds = $east_asia_postcard['MODS'];
@@ -263,7 +337,6 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
     $ds->mimeType = 'application/xml';
 
     $ds->setContentFromString((string) $mods_doc);
-    //$ds->setContentFromFile($file);
     try {
 
       $east_asia_postcard->ingestDatastream($ds);
@@ -278,7 +351,6 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
     $ds->setContentFromString((string) $mods_doc);
     drush_log("Updated the MODS Datastream for $book_pid", 'success');
   }
-
 }
 
 function drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, $coll_prefix, $start = 1, $end = 10000) {

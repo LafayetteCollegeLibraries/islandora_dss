@@ -10,9 +10,29 @@ $module_path = drupal_get_path('module', 'islandora_dss');
 @include_once "$module_path/vendor/autoload.php";
 @include_once "$module_path/libraries/Islandora.php";
 
+function drush_islandora_dss_islandora_ds_xpath_prune($object_id, $ds_id, $xpath, $value,
+						      $namespace_prefix = NULL,
+						      $namespace_uri = NULL) {
+  
+  // Instantiate the connection as the admin user
+  $connection = islandora_get_tuque_connection(user_load(1));
+
+  $session = new IslandoraSession($connection);
+  $object = new IslandoraObject($session, $object_id);
+
+  $object->prune_xml_element($ds_id, $xpath, $value,
+			     $namespace_prefix,
+			     $namespace_uri);
+
+  drush_log(dt("Updated the MODS Datastream for !object_id", array('!object_id' => $object_id)), 'success');
+}
+
 function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpath, $value,
 						       $namespace_prefix = NULL,
-						       $namespace_uri = NULL) {
+						       $namespace_uri = NULL,
+						       $element_name = NULL,
+						       $element_attribute_name = NULL,
+						       $element_attribute_value = NULL) {
   
   // Instantiate the connection as the admin user
   $connection = islandora_get_tuque_connection(user_load(1));
@@ -22,7 +42,12 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 
   $object->update_xml_element($ds_id, $xpath, $value,
 			      $namespace_prefix,
-			      $namespace_uri);
+			      $namespace_uri,
+			      $element_name,
+			      $element_attribute_name,
+			      $element_attribute_value);
+
+  drush_log(dt("Updated the MODS Datastream for !object_id", array('!object_id' => $object_id)), 'success');
 }
 
 /**

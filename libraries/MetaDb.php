@@ -11,7 +11,9 @@
 class MetaDbModsFactory {
 
   public static $METADB_PROJECT_NAMES = array('imperial-postcards' => 'east-asia',
-					      'warner-negs-taiwan' => 'east-asia');
+					      'warner-negs-taiwan' => 'east-asia',
+					      'tjwar-postcards' => 'east-asia',
+					      );
 
   /**
    * Static method for generating the Class name from the MetaDB Project name
@@ -28,15 +30,7 @@ class MetaDbModsFactory {
     return implode(array_map('ucfirst', explode('-', $project_name))) . 'ModsDoc';
   }
 
-  /*
-  public $pg_host;
-  public $pg_database;
-  public $pg_user;
-  public $pg_password;
-  */
-
   // For the PDO Handler
-
   public $pg;
 
   /**
