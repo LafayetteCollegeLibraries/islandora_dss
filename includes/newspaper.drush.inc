@@ -104,7 +104,7 @@ function drush_islandora_dss_newspaper_append_dc_xml($date_value, $book_pid, $su
   return $dc_xml;
 }
 
-function drush_islandora_dss_newspaper_append_mods_xml($date_value) {
+function islandora_dss_newspaper_generate_mods_xml($date_value) {
 
   $mods_xml = '
 <mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -171,6 +171,21 @@ function drush_islandora_dss_newspaper_append_mods_xml($date_value) {
   return $mods_xml;
 }
 
+function drush_islandora_dss_islandora_book_newspaper_append_mods_xml($pid) {
+
+  $object = islandora_object_load($pid);
+  $ds_mods = $object['MODS'];
+
+  preg_match('/(\d{4}-\d{2}-\d{2})/', $object->label, $m);
+  
+  $date_value = $m[1];
+
+  $mods = islandora_dss_newspaper_generate_mods_xml($date_value);
+
+  $ds_mods->setContentFromString($mods);
+  
+}
+
 /**
  * @see islandora_ingest_form_prepare_new_object()
  *
@@ -217,7 +232,7 @@ function drush_islandora_dss_islandora_book_newspaper_ingest($file_name, $date_i
   drush_log(t("Ingested $file_name into the OBJ datastream"), 'success');
   
   // Abstract and refactor
-  foreach(array('MODS' => drush_islandora_dss_newspaper_append_mods_xml($solr_datestamp)) as $ds_id => $content) {
+  foreach(array('MODS' => islandora_dss_newspaper_generate_mods_xml($solr_datestamp)) as $ds_id => $content) {
 
     drush_log(t("Ingesting the $ds_id datastream..."), 'ok');
     $ds = $newspaper->constructDatastream($ds_id, 'X');
@@ -239,6 +254,9 @@ function drush_islandora_dss_islandora_book_newspaper_ingest($file_name, $date_i
   $height = variable_get('islandora_pdf_thumbnail_height', 200);
   islandora_pdf_add_jpg_derivative($newspaper, $file_name, 'TN', $width, $height);
   drush_log(t("Generated the thumbnail for {$newspaper->id}"), 'success');
+
+  // Index the Book Object for the newspaper
+  islandora_dss_generate_islandora_path('Lafayette Newspaper Collection', $newspaper);
 }
 
 /**

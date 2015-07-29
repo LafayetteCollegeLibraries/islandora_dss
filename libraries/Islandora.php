@@ -102,9 +102,9 @@ class IslandoraSolrIndex {
     // @todo Ensure that Solr receives a "commit" after updating the Fedora Generic Search index
   }
 
-  function search($solr_query, $params = array('fl' => 'PID', 'sort' => 'dc.title asc')) {
+  function search($solr_query, $params = array('fl' => 'PID', 'sort' => 'dc.title asc'), $start = 0, $rows = 1000000) {
 
-    $solr_results = $this->solr->search($solr_query, 0, 1000000, $params);
+    $solr_results = $this->solr->search($solr_query, $start, $rows, $params);
 
     return json_decode($solr_results->getRawResponse(), TRUE);
   }
@@ -234,12 +234,11 @@ class IslandoraObject implements Serializable {
   }
 
   /**
-   * @todo Update for an XPath-based approach
    *
    */
-  public function update_xml_element($ds_id, $xpath, $value,
-				     $namespace_prefix = NULL,
-				     $namespace_uri = NULL) {
+  public function prune_xml_element($ds_id, $xpath, $value,
+				    $namespace_prefix = NULL,
+				    $namespace_uri = NULL) {
 
     $this->load();
 
@@ -249,60 +248,80 @@ class IslandoraObject implements Serializable {
       throw new Exception("$ds_id is not managed as an inline XML Datastream");
     }
 
-    if(preg_match("/<$xpath>(.+?)<\/$xpath>/", $ds->content)) {
+    $ds_doc = new SimpleXmlElement($ds->content);
 
-      $xml_str = preg_replace("/<$xpath>(.+?)<\/$xpath>/", "<$xpath>$value</$xpath>", $ds->content);
-      $ds->setContentFromString($xml_str);
-    } else {
+    if(!is_null($namespace_uri)) {
 
-      //$ds_doc = new SimpleXmlElement($ds->content);
-      $dc_doc = new DOMDocument();
-      $dc_doc->loadXML($this->object['DC']->content);
-      $dc_doc->documentElement->appendChild( $dc_doc->createElementNS('http://purl.org/dc/elements/1.1/', $xpath, $value) );
-
-      $ds->setContentFromString($dc_doc->saveXML());
+      $ds_doc->registerXPathNamespace($namespace_prefix, $namespace_uri);
     }
 
-    /*
-    exit(1);
+    $elements = $ds_doc->xpath($xpath);
+
+    if(!empty($elements)) {
+
+      // Remove the element
+      $element = array_shift($elements);
+
+      $old_dom = dom_import_simplexml($element);
+
+      $old_dom->parentNode->removeChild($old_dom);
+      $ds->setContentFromString($old_dom->ownerDocument->saveXML());
+    }
+
+    $this->serialize();
+  }
+
+  /**
+   * @todo Update for an XPath-based approach
+   *
+   */
+  public function update_xml_element($ds_id, $xpath, $value,
+				     $namespace_prefix = NULL,
+				     $namespace_uri = NULL,
+				     $element_name = NULL,
+				     $element_attribute_name = NULL,
+				     $element_attribute_value = NULL) {
+
+    $this->load();
+
+    $ds = $this->object[$ds_id];
+    if($ds->controlGroup != 'X') {
+
+      throw new Exception("$ds_id is not managed as an inline XML Datastream");
+    }
 
     $ds_doc = new SimpleXmlElement($ds->content);
 
-    /*
-    foreach($ds_doc->xpath($xpath) as $key => &$node) {
-
-      print $node;
-      print $value;
-      $node = $value;
-    }
-    * /
-
-    exit(1);
-    $dom = new DOMDocument('1.0');
-    $dom->loadXML($ds->content);
-
-    $xp = new DOMXPath($dom);
     if(!is_null($namespace_uri)) {
 
-      print $namespace_uri;
-      $xp->registerNamespace($namespace_prefix,$namespace_uri);
-    }
-    print $xpath;
-    print_r($xp->evaluate($xpath));
-
-    foreach($xp->query($xpath) as $node) {
-
-      print $node;
+      $ds_doc->registerXPathNamespace($namespace_prefix, $namespace_uri);
     }
 
-    //print $ds_doc->asXml();
-    print $dom->saveXML();
-    exit(1);
+    $elements = $ds_doc->xpath($xpath);
 
-    $ds->setContentFromString($ds_doc->asXml());
+    if(!empty($elements)) {
 
+      // Replace the element
+      $element = array_shift($elements);
+      $old_dom = dom_import_simplexml($element);
 
-    */
+      $new_element = $ds_doc->addChild($element_name, $value);
+      $new_element->addAttribute($element_attribute_name, $element_attribute_value);
+      $new_element_dom = dom_import_simplexml($new_element);
+
+      $old_dom->parentNode->replaceChild($new_element_dom, $old_dom);
+
+      //echo $old_dom->ownerDocument->saveXML();
+
+      $ds->setContentFromString($old_dom->ownerDocument->saveXML());
+    } else {
+
+      $new_element = $ds_doc->addChild($element_name, $value);
+      $new_element->addAttribute($element_attribute_name, $element_attribute_value);
+
+      $ds->setContentFromString($ds_doc->saveXML());
+    }
+
     $this->serialize();
   }
 }

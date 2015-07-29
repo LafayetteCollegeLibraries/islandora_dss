@@ -33,6 +33,7 @@ require_once dirname(__DIR__) . '/islandora_dss/includes/newspaper.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/islandora_solr.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/yohe.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/alumni.drush.inc';
+require_once dirname(__DIR__) . '/islandora_dss/includes/shakespeare.drush.inc';
 
 function islandora_dss_drush_command() {
 
@@ -138,11 +139,6 @@ function islandora_dss_drush_command() {
 	  'examples' => array('Standard example' => '',),
 	  'aliases' => array());
 
-  /*
-function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpath, $value,
-						       $namespace_prefix = NULL,
-						       $namespace_uri = NULL) {
-  */
   $items['islandora-ds-xpath-update'] =
     array('description' => dt('Update the content of an XML datastream Element'),
 	  'arguments' => array('arg1' => dt('the Fedora Commons Object PID'),
@@ -151,7 +147,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg4' => dt('value'),
 			       'arg5' => dt('prefix'),
 			       'arg5' => dt('uri')),
-	  'examples' => array('Standard example' => '',),
+	  'examples' => array('Standard example' => ''),
+	  'aliases' => array());
+
+  $items['islandora-ds-xpath-prune'] =
+    array('description' => dt(''),
+	  'arguments' => array(),
+	  'examples' => array('Standard example' => ''),
 	  'aliases' => array());
 
   /**
@@ -244,6 +246,11 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 	  'description' => dt('Ingest thumbnails for any given Islandora Book Object'),
 	  'aliases' => array('book-ingest-tn'));
 
+  $items['islandora-book-derive-jpg-collection'] =
+    array(
+	  'description' => dt(''),
+	  'aliases' => array());
+
   $items['islandora-book-elc-ingest'] =
     array(
 	  'description' => dt(''),
@@ -268,7 +275,16 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
    * Islandora Page Object operations
    *
    */
-  $items['islandora-ingest-page'] =
+  $items['islandora-page-insert'] =
+    array(
+	  'description' => dt('Insert an Islandora Page'),
+	  'arguments' => array('arg1' => dt('the Book Object PID'),
+			       'arg2' => dt('the Page Object PID'),
+			       ),
+	  'examples' => array(),
+	  'aliases' => array());
+
+  $items['islandora-page-ingest'] =
     array(
 	  'description' => dt('Ingest an Islandora Page'),
 	  'arguments' => array('arg1' => dt('the Book Object PID'),
@@ -276,11 +292,8 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg3' => dt('the URL for the Fedora Commons installation'),
 			       'arg4' => dt('the Page Object PID')
 			       ),
-	  'examples' => array(
-			      'Standard example' => 'drush islandora-ingest-page islandora:bookN /var/opt/images/file.tiff',
-			      'Argument example' => 'drush islandora-ingest-page islandora:bookN /var/opt/images/file.tiff http://localhost:8080/fedora islandora:pageN',
-			      ),
-	  'aliases' => array('iip'));
+	  'examples' => array(),
+	  'aliases' => array());
 
   /**
    * Islandora Large Image Object Tasks
@@ -371,6 +384,9 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 	  'aliases' => array());
   $items['islandora-metadb-metadata-export'] =
     array('description' => dt('Ingest MetaDB metadata as a MODS Document for an Islandora Object'),
+	  'aliases' => array());
+  $items['islandora-metadb-items-offset'] =
+    array('description' => dt(''),
 	  'aliases' => array());
 
   /**
@@ -522,6 +538,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
     array(
 	  'description' => dt(''), //@todo Implement
 	  'aliases' => array());
+
+  // islandora_dss_islandora_east_asia_migrate_project
+  $items['islandora-east-asia-migrate-project'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
+
   $items['islandora-east-asia-mods-migrate'] =
     array(
 	  'description' => dt(''), //@todo Implement
@@ -535,6 +558,8 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
     array(
 	  'description' => dt(''),
 	  'aliases' => array());
+
+
 
   /**
    * Marquis de Lafayette Prints Collection tasks
@@ -579,6 +604,11 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
     array(
 	  'description' => dt(''),
 	  'aliases' => array('newspaper-ingest'));
+
+  $items['islandora-book-newspaper-append-mods-xml'] =
+    array(
+	  'description' => dt(''),
+	  'aliases' => array());
 
   /**
    * Sam S. Yohe Bushkill Stream Photo Albums tasks
@@ -646,6 +676,16 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 	  'arguments' => array('arg1' => dt(''),
 			       'arg2' => dt(''),
 			       ),
+	  'aliases' => array());
+
+  /**
+   * Shakespeare Bulletin Archive Tasks
+   *
+   */
+  $items['islandora-book-shakespeare-ingest-collection'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array(),
 	  'aliases' => array());
 
   $items['islandora-book-generate-derivative-jpg-full'] =
@@ -745,17 +785,24 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 
   $items['islandora-solr-clean-dates'] =
     array(
-	  'description' => dt('Update the Solr index for any given collection'),
-	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
-			       'arg2' => dt('Fedora Generic Search user password')),
-	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
+	  'description' => dt(''),
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt('')),
+	  'examples' => array('Standard example' => ''),
 	  'aliases' => array(''));
 
   $items['islandora-solr-update-object'] =
-    array('description' => dt('Update the Solr index for any given collection'),
-	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
-			       'arg2' => dt('Fedora Generic Search user password')),
-	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
+    array('description' => dt(''),
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt('')),
+	  'examples' => array('Standard example' => ''),
+	  'aliases' => array(''));
+
+  $items['islandora-solr-add-document'] =
+    array('description' => dt(''),
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt('')),
+	  'examples' => array('Standard example' => ''),
 	  'aliases' => array(''));
 
   $items['islandora-solr-delete-object'] =
@@ -764,6 +811,13 @@ function drush_islandora_dss_islandora_ds_xpath_update($object_id, $ds_id, $xpat
 			       'arg2' => dt('Fedora Generic Search user password')),
 	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
 	  'aliases' => array(''));
+
+  $items['islandora-solr-find-unindexed'] =
+    array('description' => dt(''),
+	  'arguments' => array('arg1' => dt(''),
+			       ),
+	  'examples' => array('Standard example' => ''),
+	  'aliases' => array());
 
   return $items;
 }
@@ -1053,83 +1107,7 @@ function drush_islandora_dss_generate_tn_ds($object, $image_file_path, $image_fi
   return $object;
 }
 
-/**
- * Ingest a Page Object for a Book Object
- *
- */
-function drush_islandora_dss_islandora_ingest_page($book_pid, $file_path, $url='http://localhost:8080/fedora', $page_pid=NULL) {
 
-  $module_path = drupal_get_path('module', 'islandora');
-  $module_path = drupal_get_path('module', 'islandora_book');
-  module_load_include('inc', 'islandora', 'includes/utilities');
-  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
-  module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
-  module_load_include('inc', 'islandora_dss', 'includes/derivatives');
-
-  // Retrieve the SIP
-  //$file = file_load($file_path);
-
-  // Get the connection
-  $connection = islandora_get_tuque_connection(user_load(1), $url);
-
-  if(!isset($page_pid)) {
-
-    $page_pid = $connection->repository->api->m->getNextPid('islandora');
-  }
-
-  $object = $connection->repository->constructObject($page_pid);
-
-  $object->owner = 'fedoraAdmin';
-  preg_match('/.*\/(.+\.tif?)/', $file_path, $m);
-  $object->label = $m[1];
-  $object->models = 'islandora:bookCModel';
-
-  $obj_ds = $object->constructDatastream('OBJ', 'M');
-  $obj_ds->setContentFromFile($file_path);
-  $obj_ds->mimetype = 'image/tiff';
-  $object->ingestDatastream($obj_ds);
-
-  $base_name = str_replace(':', '-', $object->id);
-
-  // Explicitly set the datastream for the JPEG2000
-  // This results in a series of errors
-  //$derivative_file = islandora_large_image_create_JP2_derivative($object, $file_path, $base_name);
-
-  $jp2_file_path = "temporary://{$base_name}_JP2.jp2";
-
-  // Objects are mutable
-  drush_islandora_dss_generate_image_ds($object, $file_path,
-					array('-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75)),
-					      '-resize ' . escapeshellarg("200 x 200")), 'TN', 'Thumbnail');
-
-  drush_islandora_dss_generate_image_ds($object, $file_path,
-					array('-quality ' . escapeshellarg(variable_get('imagemagick_quality', 75)),
-					      '-resize ' . escapeshellarg("600 x 800")), 'JPG', 'Medium sized JPEG');
-  drush_islandora_dss_generate_image_ds($object, $file_path, islandora_large_image_get_args(), 'JP2', 'JPEG 2000');
-
-  $book = islandora_object_load(urldecode($book_pid));
-
-  // Update RELS-EXT properties, page/sequence/etc, and append the page at the
-  // end of the book.
-  $rels_ext = $object->relationships;
-  //$language = $book->language;
-  $language = 'en-US';
-
-  $book = islandora_object_load(urldecode($book_pid));
-  $pages = islandora_paged_content_get_pages($book);
-
-  $num_pages = count($pages) + 1;
-
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
-  islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
-  islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
-  islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
-
-  $connection->repository->ingestObject($object);
-}
 
 
 
@@ -1393,7 +1371,9 @@ function drush_islandora_dss_islandora_collection_generate_paths($collection_nam
 		  'Lafayette World War II Casualties',
 		  'Marquis de Lafayette Prints Collection',
 		  'McKelvy House Photograph Collection',
-		  'Alumni Publications') as $collection_name) {
+		  'Alumni Publications',
+		  'Shakespeare Bulletin Archive'
+		  ) as $collection_name) {
 
       islandora_dss_generate_islandora_paths($collection_name, $solr_host);
     }
