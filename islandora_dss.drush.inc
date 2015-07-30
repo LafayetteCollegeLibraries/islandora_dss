@@ -39,14 +39,10 @@ function islandora_dss_drush_command() {
 
   $items = array();
 
-  //function drush_islandora_dss_islandora_ingest_page($book_pid, $file_path, $url='http://localhost:8080/fedora', $page_pid=NULL) {  
-
   /**
    * Islandora Object operations
    *
    */
-  //module_load_include('drush.inc', 'islandora_dss', 'includes/islandora_dss');
-
   $items['islandora-purge-object'] =
     array(
 	  'description' => dt('Purge an Islandora Object'),
@@ -87,7 +83,6 @@ function islandora_dss_drush_command() {
 			      ),
 	  'aliases' => array('iload'));
 
-  //function drush_islandora_dss_islandora_relabel_object($obj_pid, $label, $xpath = NULL,
   $items['islandora-relabel-object'] =
     array(
 	  'description' => dt(''),
@@ -184,8 +179,6 @@ function islandora_dss_drush_command() {
    * Islandora Collection Object Tasks
    *
    */
-  //module_load_include('drush.inc', 'islandora_dss', 'includes/islandora_basic_collection');
-
   $items['islandora-set-parent'] =
     array(
 	  'description' => dt('Set the parent collection for an Islandora Object'),
@@ -209,8 +202,6 @@ function islandora_dss_drush_command() {
    * Islandora Book Object Tasks
    *
    */
-  //module_load_include('drush.inc', 'islandora_dss', 'includes/islandora_book');
-
   $items['islandora-book-generate-alias-pdf'] =
     array(
 	  'description' => dt(''),
@@ -299,8 +290,6 @@ function islandora_dss_drush_command() {
    * Islandora Large Image Object Tasks
    *
    */
-  //module_load_include('drush.inc', 'islandora_dss', 'includes/islandora_large_image');
-
   $items['islandora-large-image-derive'] =
     array(
 	  'description' => dt('(Re)generate the derivatives for an Islandora Large Image Object'),
@@ -357,7 +346,6 @@ function islandora_dss_drush_command() {
    * CONTENTdm Tasks
    * @todo Migrate these into a CONTENTdm metadata migration Module (?)
    */
-  //module_load_include('drush.inc', 'islandora_dss', 'includes/contentdm');
 
   $items['islandora-contentdm-mods-ingest'] =
     array('description' => dt('Ingest CONTENTdm metadata as a MODS Document for an Islandora Object'),

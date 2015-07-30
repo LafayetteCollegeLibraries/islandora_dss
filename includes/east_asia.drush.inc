@@ -315,17 +315,6 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
   if( !isset( $east_asia_postcard ) ) {
 
     $east_asia_postcard = drush_islandora_dss_islandora_east_asia_ingest($file_path, $label, $project_name);
-
-    /*
-    $page_pid = $namespace;
-    drush_log("Ingesting {$front_file_path} and appending it to $book_pid...", 'ok');
-
-    if(!is_null($back_file_path)) {
-
-      $back_file = (object) array('uri' => $back_file_path);
-      islandora_dss_book_page_ingest($back_file, $book_pid, $label, $page_pid);
-    }
-    */
   }
 
   $ds = $east_asia_postcard['MODS'];
