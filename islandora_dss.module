@@ -403,7 +403,9 @@ function islandora_dss_get_alias_metadb($object, $coll_pid=NULL, $path_base='col
 			    //'eastAsia:cpw' => 'cpw',
 				  
 			    'eastAsia:cpwNofuko' => 'eastasia/cpw-nofuko',
-			    'eastAsia:cpwShashinkai' => 'eastasia/cpw-shashinkai');
+			    'eastAsia:cpwShashinkai' => 'eastasia/cpw-shashinkai',
+			    'eastAsia:tjwarPostcards' => 'eastasia/tjwar-postcards',
+			    );
 
   $METADB_PROJECT_PID_MAP = array(
 				  'islandora:mdlPrints' => 'mdl-prints',
@@ -433,7 +435,9 @@ function islandora_dss_get_alias_metadb($object, $coll_pid=NULL, $path_base='col
 			      'Gerald & Rella Warner Souvenirs of Beijing and Tokyo' => 'eastasia/warner-souvenirs',
 			      'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
 			      'Scenic Taiwan' => 'eastasia/cpw-nofuko',
-			      'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai');
+			      'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
+			      'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/tjwar-postcards'
+			      );
 
     $METADB_PROJECT_PID_MAP = array(
 				    'Lafayette Newspaper Collection' => 'newspaper',
@@ -732,7 +736,9 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
 				 'Gerald & Rella Warner Souvenirs of Beijing and Tokyo' => 'eastasia/warner-souvenirs',
 				 'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
 				 'Scenic Taiwan' => 'eastasia/cpw-nofuko',
-				 'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai');
+				 'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
+				 'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/tjwar-postcards',
+				 );
 
   try {
 
@@ -1477,14 +1483,10 @@ function islandora_dss_object_datastream_access_callback($perm, $object = NULL, 
 
     // If this isn't the newspaper...
     /* @todo Refactor */
-    if( $_SERVER['REMOTE_ADDR'] != variable_get('islandora_dss_geoserver_host', '139.147.4.148') and !in_array('islandora:newspaper', $object->getParents()) and !in_array('islandora:alumni', $object->getParents()) ) {
-
-      /*
-    if(!in_array($_SERVER['REMOTE_ADDR'], array(variable_get('islandora_dss_geoserver_host', '139.147.4.148'),
-						variable_get('islandora_dss_juxta_juxta_ws_host', '139.147.4.144')))
-
-       and !in_array('islandora:newspaper', $object->getParents()) and !in_array('islandora:alumni', $object->getParents())) {
-      */
+    $permitted_collection_pids = variable_get('islandora_dss_permitted_collection_pids', array('islandora:newspaper', 'islandora:alumni', 'islandora:shakespeare'));
+    $intersect = array_intersect($object->getParents(), $permitted_collection_pids);
+    $intersect = !empty($intersect); // At least one PID
+    if( $_SERVER['REMOTE_ADDR'] != variable_get('islandora_dss_geoserver_host', '139.147.4.148') and !$intersect ) {
 
       // Authenticated
       return user_access('administer site configuration') && islandora_object_datastream_access_callback($perm, $object, $datastream, $account);

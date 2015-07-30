@@ -126,7 +126,7 @@ function drush_islandora_dss_islandora_collection_generate_paths_jpg_full($colle
 				 'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
 				 'Scenic Taiwan' => 'eastasia/cpw-nofuko',
 				 'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
-				 'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/truku'
+				 'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/tjwar-postcards'
 				 );
 
   try {
