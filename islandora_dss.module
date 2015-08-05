@@ -376,31 +376,31 @@ function islandora_dss_get_alias_metadb($object, $coll_pid=NULL, $path_base='col
 			      'eastAsia:rjwStereo' => 'eastasia/rjw-stereo',
 			      'eastAsia:imperialPostcards' => 'eastasia/imperial-postcards',
 			    
-			    //'eastAsia:postcardAlbums' => 'postcard-albums',
+			      //'eastAsia:postcardAlbums' => 'postcard-albums',
 				
-			    'eastAsia:paTsubokura' => 'eastasia/pa-tsubokura',
-			    'eastAsia:paOmitsu01' => 'eastasia/pa-omitsu01',
-			    'eastAsia:paOmitsu02' => 'eastasia/pa-omitsu02',
+			      'eastAsia:paTsubokura' => 'eastasia/pa-tsubokura',
+			      'eastAsia:paOmitsu01' => 'eastasia/pa-omitsu01',
+			      'eastAsia:paOmitsu02' => 'eastasia/pa-omitsu02',
 				
-			    'eastAsia:linPostcards' => 'eastasia/lin-postcards',
+			      'eastAsia:linPostcards' => 'eastasia/lin-postcards',
 				  
-			    //'eastAsia:gameCards' => 'game-cards',
-			    'eastAsia:japanStudyCards' => 'eastasia/japan-study-cards',
+			      //'eastAsia:gameCards' => 'game-cards',
+			      'eastAsia:japanStudyCards' => 'eastasia/japan-study-cards',
 				  
-			    'eastAsia:pacwarPostcards' => 'eastasia/pacwar-postcards',
+			      'eastAsia:pacwarPostcards' => 'eastasia/pacwar-postcards',
 				  
-			    'eastAsia:lewis' => 'eastasia/lewis-postcards',
+			      'eastAsia:lewis' => 'eastasia/lewis-postcards',
 				  
-			    'eastAsia:warnerPostcards' => 'eastasia/warner-postcards',
-			    'eastAsia:warnerNegsIndonesia' => 'eastasia/warner-negs-indonesia',
-			    'eastAsia:warnerNegsManchuria' => 'eastasia/warner-negs-manchuria',
-			    'eastAsia:warnerNegsTaiwan' => 'eastasia/warner-negs-taiwan',
-			    'eastAsia:warnerSlidesJapan' => 'eastasia/warner-slides-japan',
-			    'eastAsia:warnerSouvenirs' => 'eastasia/warner-souvenirs',
+			      'eastAsia:warnerPostcards' => 'eastasia/warner-postcards',
+			      'eastAsia:warnerNegsIndonesia' => 'eastasia/warner-negs-indonesia',
+			      'eastAsia:warnerNegsManchuria' => 'eastasia/warner-negs-manchuria',
+			      'eastAsia:warnerNegsTaiwan' => 'eastasia/warner-negs-taiwan',
+			      'eastAsia:warnerSlidesJapan' => 'eastasia/warner-slides-japan',
+			      'eastAsia:warnerSouvenirs' => 'eastasia/warner-souvenirs',
 				
-			    'eastAsia:woodsworthImages' => 'eastasia/woodsworth-images',
+			      'eastAsia:woodsworthImages' => 'eastasia/woodsworth-images',
 				  
-			    //'eastAsia:cpw' => 'cpw',
+			      //'eastAsia:cpw' => 'cpw',
 				  
 			    'eastAsia:cpwNofuko' => 'eastasia/cpw-nofuko',
 			    'eastAsia:cpwShashinkai' => 'eastasia/cpw-shashinkai',
@@ -436,8 +436,7 @@ function islandora_dss_get_alias_metadb($object, $coll_pid=NULL, $path_base='col
 			      'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
 			      'Scenic Taiwan' => 'eastasia/cpw-nofuko',
 			      'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
-			      'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/tjwar-postcards'
-			      );
+			      'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/truku');
 
     $METADB_PROJECT_PID_MAP = array(
 				    'Lafayette Newspaper Collection' => 'newspaper',
@@ -545,7 +544,7 @@ function islandora_dss_generate_citation_aliases($collection='East Asia Image Co
  */
 function islandora_dss_purge_islandora_paths($coll_pid, $solr_host = 'localhost') {
 
-  $solr = new Apache_Solr_Service($solr_host, 8080, 'solr/fedora_5' . '/');
+  $solr = new Apache_Solr_Service($solr_host, 8080, 'solr/fedora' . '/');
 
   $EASTASIA_RELATION_MAP = array('East Asia Image Collection' => 'eastasia',
 				 'Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
@@ -623,30 +622,58 @@ function islandora_dss_purge_islandora_paths($coll_pid, $solr_host = 'localhost'
  */
 function islandora_dss_generate_islandora_path($subcollection, $member, $doc = NULL) {
 
-      //$subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
-
-      //$member = islandora_object_load($solr_doc['PID']);
-
-      /**
-       * Handling for members of the Alumni Publications Collection
-       *
-       */
   if($subcollection == 'Shakespeare Bulletin Archive') {
+    
+    /**
+     * Handling for members of the Shakespeare Bulletin Archive
+     *
+     */
+    // Collision for Shakespeare on Film Newsletter1993-04-01T00:00:00Z
 
+    $pub_title = $doc['MODS.mods.relatedItem.titleInfo.title_ss'];
     $date_issued_stamps = $doc['MODS.mods.originInfo.dateIssued.w3cdtf_dt'];
     $date_issued_stamp = array_shift($date_issued_stamps);
-
     $date_issued = new DateTime($date_issued_stamp);
 
-    if(false) {
-      
-      drush_log(dt("Cannot generate the path for !member_label", array('!member_label' => $member->label)), 'warning');
-      exit(1);
+    if($pub_title == 'Shakespeare on Film Newsletter') {
 
+      if($date_issued_stamp == '1993-04-01T00:00:00Z') {
+
+	if($member->id == 'shakespeare:61') {
+
+	  $alias = 'collections/sfnl/' . $date_issued->format('Ymd') . 'a';
+	} else {
+
+	  $alias = 'collections/sfnl/' . $date_issued->format('Ymd') . 'b';
+	}
+      } else {
+
+	$alias = 'collections/sfnl/' . $date_issued->format('Ymd');
+      }
+    } elseif($pub_title == 'Shakespeare Bulletin') {
+
+      $alias = 'collections/sb/' . $date_issued->format('Ymd');
+    }
+
+    // Generate the path for the PDF datastream
+    $pdf_alias = $alias . '/pdf';
+    $pdf_path = array('source' => "islandora/object/{$member->id}/datastream/OBJ/download",
+		      'alias' => $pdf_alias);
+    path_save($pdf_path);
+
+  } elseif($subcollection == 'Alumni Publications') {
+
+    /**
+     * Handling for members of the Alumni Publications Collection
+     *
+     */
+    if(!preg_match('/_(\d+)[A-Z]?$/', $member->label, $m)) {
+
+      drush_log(dt("Cannot generate the path for !member_label", array('!member_label' => $member->label)), 'warning');
       continue;
     } else {
 
-      $alias = 'collections/sbarchive/' . $date_issued->format('Ymd');
+      $alias = 'collections/alumni/' . $m[1];
 
       // Generate the path for the PDF datastream
       $pdf_alias = $alias . '/pdf';
@@ -655,56 +682,39 @@ function islandora_dss_generate_islandora_path($subcollection, $member, $doc = N
       path_save($pdf_path);
     }
 
-  } elseif($subcollection == 'Alumni Publications') {
+  } elseif($subcollection == 'Lafayette Newspaper Collection') {
+
+    /**
+     * Specialized handling for the newspaper aliases
+     *
+     */
+    preg_match('/(\d{4}-\d{2}-\d{2})/', $member->label, $m);
+    $alias = 'collections/newspaper/' . implode(explode('-', $m[1]));
+
+    // Generate the path for the PDF datastream
+    $pdf_alias = $alias . '/pdf';
+    $pdf_path = array('source' => "islandora/object/{$member->id}/datastream/OBJ/download",
+		      'alias' => $pdf_alias);
+    path_save($pdf_path);
+    
+  } else {
+
+    $alias = islandora_dss_get_alias_metadb($member, $subcollection);
+  }
       
-	if(!preg_match('/_(\d+)[A-Z]?$/', $member->label, $m)) {
+  $path = array('source' => "islandora/object/{$member->id}",
+		'alias' => $alias);
 
-	  drush_log(dt("Cannot generate the path for !member_label", array('!member_label' => $member->label)), 'warning');
-	  continue;
-	} else {
+  drush_log("Generating $alias for {$member->id} within $subcollection", 'ok');
+  path_delete(array('source' => $path['source']));
 
-	  $alias = 'collections/alumni/' . $m[1];
+  if($alias == 'collections/') {
 
-	  // Generate the path for the PDF datastream
-	  $pdf_alias = $alias . '/pdf';
-	  $pdf_path = array('source' => "islandora/object/{$member->id}/datastream/OBJ/download",
-			    'alias' => $pdf_alias);
-	  path_save($pdf_path);
-	}
+    drush_log("Cannot generate the path for {$member->id}", 'warn');
+    exit(1);
+  }
 
-      /**
-       * Specialized handling for the newspaper aliases
-       *
-       */
-      } elseif($subcollection == 'Lafayette Newspaper Collection') {
-
-	preg_match('/(\d{4}-\d{2}-\d{2})/', $member->label, $m);
-	$alias = 'collections/newspaper/' . implode(explode('-', $m[1]));
-
-	// Generate the path for the PDF datastream
-	$pdf_alias = $alias . '/pdf';
-	$pdf_path = array('source' => "islandora/object/{$member->id}/datastream/OBJ/download",
-			  'alias' => $pdf_alias);
-	path_save($pdf_path);
-	
-      } else {
-
-	$alias = islandora_dss_get_alias_metadb($member, $subcollection);
-      }
-      
-      $path = array('source' => "islandora/object/{$member->id}",
-		    'alias' => $alias);
-
-      drush_log("Generating $alias for {$member->id} within $subcollection", 'ok');
-      path_delete(array('source' => $path['source']));
-
-      if($alias == 'collections/') {
-
-	drush_log("Cannot generate the path for {$member->id}", 'warn');
-	exit(1);
-      }
-
-      path_save($path);
+  path_save($path);
 }
 
 /**
@@ -737,13 +747,13 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
 				 'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
 				 'Scenic Taiwan' => 'eastasia/cpw-nofuko',
 				 'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
-				 'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/tjwar-postcards',
+				 'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/truku',
 				 );
 
   try {
 
     $solr_query = "cdm.Relation.IsPartOf:\"$coll_pid\"";
-    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf dc.date.sort MODS.mods.originInfo.dateIssued.w3cdtf_dt', 'sort' => 'dc.title asc'));
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf dc.date.sort MODS.mods.originInfo.dateIssued.w3cdtf_dt MODS.mods.relatedItem.titleInfo.title_ss', 'sort' => 'dc.title asc'));
   } catch (Exception $e) {
 
     drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
@@ -760,15 +770,12 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
 
       islandora_dss_generate_islandora_path($subcollection, $member, $solr_doc);
 
-      // Is there a back for these images?
-      drush_log("Successfully generated the path {$path['alias']} for {$solr_doc['PID']}", 'success');
-
+      drush_log(dt("Successfully generated the path !alias for !pid", array('!alias' => $path['alias'], '!pid' => $solr_doc['PID'])), 'success');
     } catch(Exception $e) {
 
-      drush_log("Failure: {$e->getMessage()}", 'error');
+      drush_log(dt("Failure: !message", array('!message' => $e->getMessage())), 'error');
     }
   }
-
 }
 
 /**
@@ -1128,11 +1135,13 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
   // Do not attempt to derive a branded JPEG for the Object if the MODS Document does not exist
   $jpg_ds = $object[$ds_id];
 
+  /*
   if(!$regenerate && $jpg_ds->size > 9000) {
 
     drush_log(dt("The JPG datastream for !object_id appears to been generated properly", array('!object_id' => $object->id)), 'ok');
     return TRUE;
   }
+  */
 
   drush_log( dt('Deriving the branded JPEG for !object_id', array('!object_id' => $object->id)), 'ok' );
 
@@ -1182,13 +1191,12 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
     drush_log("Ingested $metadb_file_path into the OBJ datastream for for {$object->id}", 'success');
   }
 
-
   $jp2_ds = $object['JP2'];
-
   $jp2_data = $jp2_ds->content;
 
   if(empty($jp2_data)) {
 
+    /*
     drush_log("{$object->id} appears to be missing a JPEG2000 datastream", 'error');
 
     //$tiff_file = file_save_data($obj_data, "temporary://{$base_name}_OBJ.tiff");
@@ -1203,10 +1211,21 @@ function islandora_dss_generate_derivative_jpg_large_image($pid, $connection = N
 
     $jp2_data = $object['JP2']->content;
 
-    return FALSE;
-  }
+    //return FALSE;
+    */
+    
+    if(!$obj_ds) {
 
-  $jp2file = file_save_data($jp2_data, "temporary://{$base_name}_OBJ.jp2");
+      echo 'trace2';
+      exit(1);
+    }
+
+    $jp2_data = $obj_ds->content;
+    $jp2file = file_save_data($jp2_data, "temporary://{$base_name}_OBJ.tif");
+  } else {
+
+    $jp2file = file_save_data($jp2_data, "temporary://{$base_name}_OBJ.jp2");
+  }
 
   $args = array();
 

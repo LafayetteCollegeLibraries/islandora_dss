@@ -306,18 +306,25 @@ class IslandoraObject implements Serializable {
       $old_dom = dom_import_simplexml($element);
 
       $new_element = $ds_doc->addChild($element_name, $value);
-      $new_element->addAttribute($element_attribute_name, $element_attribute_value);
+
+      if(!is_null($element_attribute_value)) {
+
+	$new_element->addAttribute($element_attribute_name, $element_attribute_value);
+      }
+
       $new_element_dom = dom_import_simplexml($new_element);
 
       $old_dom->parentNode->replaceChild($new_element_dom, $old_dom);
-
-      //echo $old_dom->ownerDocument->saveXML();
 
       $ds->setContentFromString($old_dom->ownerDocument->saveXML());
     } else {
 
       $new_element = $ds_doc->addChild($element_name, $value);
-      $new_element->addAttribute($element_attribute_name, $element_attribute_value);
+
+      if(!is_null($element_attribute_value)) {
+
+	$new_element->addAttribute($element_attribute_name, $element_attribute_value);
+      }
 
       $ds->setContentFromString($ds_doc->saveXML());
     }

@@ -27,7 +27,6 @@ function drush_islandora_dss_islandora_mdl_prints_ingest($file_path) {
     // Migrate the metadata from MetaDB
     return drush_islandora_dss_islandora_metadb_mods_ingest('mdl-prints', $item_id, $object->id);
   }
-
   }
 
 function drush_islandora_dss_islandora_mdl_prints_derive_jpeg($obj_pid) {
@@ -84,210 +83,142 @@ function drush_islandora_dss_islandora_mdl_prints_append_source($collection_name
   }
 }
 
-/**
- * Deprecated; Use MetaDB
- */
-function drush_islandora_dss_islandora_mdl_prints_cdm_ingest($cdm_csv_file_path = 'MarquisDeLafayettePrints.csv', $field_value = 'Lafayette College Art Collection') {
+function islandora_dss_sort_doc_nodes($u, $v) {
 
-  $solr = new Apache_Solr_Service('localhost', 8080, 'solr/fedora_5' . '/');
+  return strcmp($u->tagName, $v->tagName);
+}
 
-  $cdm_csv_file = fopen($cdm_csv_file_path, 'rb');
-  $csv = array();
-  $urls = array();
-  //while(($field = fgetcsv($cdm_csv_file, 0, "\t")) !== FALSE) {
-  while(($field = fgetcsv($cdm_csv_file, 0, "\n")) !== FALSE) {
+function islandora_dss_sort_doc($doc) {
 
-    $csv[] = $field;
-	
-    preg_match('/(http\:\/\/metadb\.lafayette\.edu\/download\.html\?item=mdl\-prints\-\d{4,5})/', implode(' ', $field), $m);
-    $urls[] = $m[1];
+  $dom = new DOMDocument('1.0');
+  $dom->preserveWhiteSpace = false;
+  $dom->formatOutput = true;
+  $dom->loadXML($doc->asXml());
+
+  $sorted_dom = new DOMDocument('1.0');
+  $sorted_dom->preserveWhiteSpace = false;
+  $sorted_dom->formatOutput = true;
+  $root = $sorted_dom->createElement('mods');
+  $sorted_dom->appendChild($root);
+
+  $xp = new DOMXPath($dom);
+  $mods_elements = $xp->query('/mods:mods/*');
+  
+  usort($mods_elements, 'islandora_dss_sort_doc_nodes');
+  
+  foreach($mods_elements as $mods_element) {
+
+    $node = $sorted_dom->importNode($mods_element, TRUE);
+    $root->appendChild($node);
   }
-  fclose($cdm_csv_file);
-      
-  foreach($urls as $url) {
+  
+  return $sorted_dom;
+}
 
-    $object_has_cdm_metadata = FALSE;
+/**
+ * Quality Assurance for MetaDB Item migration
+ *
+ */
+function drush_islandora_dss_islandora_mdl_prints_validate($solr_host = 'localhost',
+							   $metadb_host = 'localhost',
+							   $collection_name = 'Marquis de Lafayette Prints Collection') {
 
-    /*
-    if(in_array(trim($url), $solr_doc['dc.identifier'])) {
+  $solr = new Apache_Solr_Service($solr_host, 8080, 'solr/fedora' . '/');
+  //$index = new IslandoraSolrIndex($solr);
 
-      $object_has_cdm_metadata = TRUE;
-    }
-    */
-    try {
+  $solr_query = 'cdm.Relation.IsPartOf:"' . $collection_name . '"';
+  //$solr_results = $index->search($solr_query);
 
-      //$solr_query = "mdl_prints.source:\"" . $field_value . "\"";
-      //$solr_query = "mdl_prints.source:\"" . $field_value . "\" AND " . "dc.identifier:\"" . $url . "\" OR " . "dc.identifier:\"" . $url . "\"";
-      $solr_query = "dc.identifier:\"" . $url . "\"";
-      $response = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID dc.title dc.identifier', 'sort' => 'dc.title asc'));
+  $params = array('fl' => 'PID', 'sort' => 'dc.title asc');
+  $start = 0;
+  $rows = 1000000;
 
-      $solr_results = json_decode($response->getRawResponse(), TRUE);
+  $solr_results = $solr->search($solr_query, $start, $rows, $params);
+  $solr_response = json_decode($solr_results->getRawResponse(), TRUE);
 
-      $object_has_cdm_metadata = !empty($solr_results['response']['docs']);
+  $metadb_ids = array();
 
-      /*
-      foreach($solr_results['response']['docs'] as $solr_doc) {
+  foreach($solr_response['response']['docs'] as $solr_doc) {
 
-      }
-      */
-    } catch (Exception $e) {
+    // Retrieve the Object
+    $object = islandora_object_load($solr_doc['PID']);
 
-      drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
-    }
+    // Retrieve the MODS Document
+    $mods_ds = $object['MODS'];
 
-    if($object_has_cdm_metadata) {
+    if(!$mods_ds) {
 
-      //drush_log(dt("The CONTENTdm was already ingested for @object_title (@object_id)", array('@object_title' => $solr_doc['dc.title'], '@object_id' => $solr_doc['PID'])), 'ok');
-      //drush_log(dt("The CONTENTdm was already ingested for @url", array('@url' => $url)), 'ok');
+      drush_log(dt('!object_id has no MODS Datastream!', array('!object_id' => $object->id)), 'error');
     } else {
 
-      /*
-      drush_log(dt("Could not locate the metadata for @object_title (@object_id) using @url", array('@object_title' => $solr_doc['dc.title'],
-												    '@object_id' => $solr_doc['PID'])));
-      */
-      drush_log(dt("The CONTENTdm was not ingested for @url", array('@url' => $url)), 'warning');
+      // Load the MODS Document from the Datastream
+      $mods_doc = new SimpleXMLElement($mods_ds->content);
+
+      $mods_doc->registerXPathNamespace( 'mods' , 'http://www.loc.gov/mods/v3' );
+
+      // Retrieve the MetaDB Item ID from the MODS Document
+      $url_elements = $mods_doc->xpath('//mods:location/mods:url[@displayLabel="Download"]');
+
+      if(empty($url_elements)) {
+
+	drush_log(dt('!object_id has no MetaDB identifier within the MODS Document!', array('!object_id' => $object->id)), 'error');
+	exit(1);
+      } else {
+
+	$url_element = array_shift($url_elements);
+	$url = (string) $url_element;
+
+	if(!preg_match('/item=mdl\-prints\-(.+)$/', $url, $metadb_item_id_match)) {
+
+	  drush_log(dt('!object_id has an invalid MetaDB URL within the MODS Document!', array('!object_id' => $object->id)), 'error');
+	  exit(1);
+	} else {
+
+	  $metadb_item_id = $metadb_item_id_match[1];
+
+	  if(in_array($metadb_item_id, $metadb_ids)) {
+
+	    drush_log(dt('The MetaDB Item !metadb_item_id metadata has been duplicated for !object_id', array('!object_id' => $object->id,
+													      '!metadb_item_id' => $metadb_item_id)), 'error');
+	    exit(1);
+	  } else {
+	    
+	    drush_log(dt('The MetaDB Item !metadb_item_id metadata was ingested into !object_id', array('!object_id' => $object->id,
+													'!metadb_item_id' => $metadb_item_id)), 'success');
+	    $metadb_ids[] = $metadb_item_id;
+
+	  }
+
+	  // Load the MetaDB Item
+	  $mods_factory = new MetaDbModsFactory($metadb_host);
+	  $metadb_mods_doc = $mods_factory->get_doc('mdl-prints', $metadb_item_id);
+
+	  $metadb_url_elements = $metadb_mods_doc->doc->xpath('//mods:location/mods:url[@displayLabel="Download"]');
+	  $metadb_url_element = array_shift($metadb_url_elements);
+
+	  if((string) $metadb_url_element != $url) {
+
+	    drush_log(dt('!object_id does not map to the MetaDB Item !metadb_item_id!', array('!object_id' => $object->id,
+											      '!metadb_item_id' => $metadb_item_id)), 'error');
+
+	  } else {
+
+	    drush_log(dt('!object_id maps to the MetaDB Item !metadb_item_id', array('!object_id' => $object->id,
+										     '!metadb_item_id' => $metadb_item_id)), 'success');
+	  }
+	}
+      }
     }
   }
 
-  exit(1);
+  $metadb_ids_range = array_map(function($id) {
 
-  try {
+      return sprintf("%05d", $id);
+    }, range(1, 661));
 
-    $solr_query = "mdl_prints.source:\"" . $field_value . "\"";
-    $response = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID dc.title dc.identifier', 'sort' => 'dc.title asc'));
+  $diff_ids = array_diff($metadb_ids_range, $metadb_ids);
+  foreach($diff_ids as $diff_id) {
 
-    $solr_results = json_decode($response->getRawResponse(), TRUE);
-
-    //$cdm_csv_file = fopen($cdm_csv_file_path, 'rb');
-
-    foreach($solr_results['response']['docs'] as $solr_doc) {
-
-      $object_has_cdm_metadata = FALSE;
-
-      $cdm_csv_file = fopen($cdm_csv_file_path, 'rb');
-      $csv = array();
-      $urls = array();
-      //while(($field = fgetcsv($cdm_csv_file, 0, "\t")) !== FALSE) {
-      while(($field = fgetcsv($cdm_csv_file, 0, "\n")) !== FALSE) {
-
-	$csv[] = $field;
-	
-	preg_match('/(http\:\/\/metadb\.lafayette\.edu\/download\.html\?item=mdl\-prints\-\d{4,5})/', implode(' ', $field), $m);
-	$urls[] = $m[1];
-      }
-      fclose($cdm_csv_file);
-
-      foreach($urls as $url) {
-
-	if(in_array(trim($url), $solr_doc['dc.identifier'])) {
-
-	  $object_has_cdm_metadata = TRUE;
-	}
-      }
-
-      if($object_has_cdm_metadata) {
-
-	drush_log(dt("The CONTENTdm was already ingested for @object_title (@object_id)", array('@object_title' => $solr_doc['dc.title'], '@object_id' => $solr_doc['PID'])), 'ok');
-      } else {
-
-	drush_log(dt("Could not locate the metadata for @object_title (@object_id) using @url", array('@object_title' => $solr_doc['dc.title'],
-												      '@object_id' => $solr_doc['PID'])));
-      }
-    }
-
-    /*
-      //$csv = array_map('str_getcsv', array(file_get_contents($cdm_csv_file_path)));
-      //$csv = str_getcsv(file_get_contents($cdm_csv_file_path), "\t");
-      for($row_index=0;$row_index < count($csv);$row_index++) {
-
-	$row_index++;
-	if($row_index == 1) {
-
-	  continue;
-	}
-
-	$field = $csv[$row_index];
-
-	$title = $field[0];
-	$source = $field[16];
-	$url = $field[18];
-
-	//print $url;
-	//print_r($solr_doc['dc.identifier']);
-
-	//for($k=0;(count($field) - 1 > $j) and !preg_match('/\.html\?item=mdl\-prints\-\d{4,5}$/', $url . $field[$j]);$j++) {
-	$k=1;
-	while(!preg_match('/\.jp2$/', end($field))) {
-
-	  $row_index += $k;
-	  $field = array_merge($field, $csv[$row_index]);
-	  $k++;
-	}
-
-	if(count($field) < 18) {
-
-	  // Attempt to merge the URL's
-	  $field = array_merge($field, $csv[$row_index]);
-	  $url = $field[18];
-	  $row_index++;
-	}
-
-	for($j=19;(count($field) - 1 > $j) and !preg_match('/\.html\?item=mdl\-prints\-\d{4,5}$/', $url . $field[$j]);$j++) {
-
-	  $url .= $field[$j];
-	  //print $url . "\n";
-	}
-
-	if(!preg_match('/\.html\?item=mdl\-prints\-\d{4,5}$/', $url)) {
-
-	  print_r($field);
-	  print $row_index;
-	  throw new Exception("Improperly structured value");
-	}
-
-	if($url == '') {
-
-	  print_r($field);
-	  throw new Exception("Empty URL");
-	  //continue;
-	}
-
-	//drush_log(dt("Matching URL @url...", array('@url' => trim($url))), 'ok');
-
-	if(in_array(trim($url), $solr_doc['dc.identifier'])) {
-
-	  $object_has_cdm_metadata = TRUE;
-
-	  //print $field[16];
-	  /*
-	  print_r($field);
-	  print_r($solr_doc);
-	  * /
-
-	  //fclose($cdm_csv_file);
-	  //exit(1);
-	}
-
-	$prev_field = $field;
-      }
-
-      if($object_has_cdm_metadata) {
-
-	//drush_log(dt("The CONTENTdm was already ingested for @object_title (@object_id)", array('@object_title' => $solr_doc['dc.title'], '@object_id' => $solr_doc['PID'])), 'ok');
-      } else {
-
-	drush_log(dt("Could not locate the metadata for @object_title (@object_id) using @url", array('@object_title' => $solr_doc['dc.title'],
-												      '@object_id' => $solr_doc['PID'],
-												      '@url' => $url)), 'warning');
-      }
-    }
-    */
-
-    //fclose($cdm_csv_file);
-  } catch (Exception $e) {
-
-    drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
+    drush_log(dt('The MetaDB Item !metadb_item_id metadata has not been ingested into Islandora', array('!metadb_item_id' => $diff_id)), 'error');
   }
-
-  
 }

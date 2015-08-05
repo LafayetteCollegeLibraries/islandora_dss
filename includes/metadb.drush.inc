@@ -11,18 +11,22 @@ $module_path = drupal_get_path('module', 'islandora_dss');
 @include_once "$module_path/libraries/MetaDb.php";
 @include_once "$module_path/libraries/Islandora.php";
 
-function drush_islandora_dss_islandora_metadb_mods_ingest($project_name, $item_id, $object_id = NULL) {
+function drush_islandora_dss_islandora_metadb_mods_ingest(
+							  $metadb_host = 'localhost',
+							  $project_name,
+							  $item_id,
+							  $object_id = NULL) {
 
   // Instantiate the connection as the admin user
   $connection = islandora_get_tuque_connection(user_load(1));
 
-  $mods_factory = new MetaDbModsFactory('127.0.0.1');
+  $mods_factory = new MetaDbModsFactory($metadb_host);
   $mods_doc = $mods_factory->get_doc($project_name, $item_id);
 
-  print (string) $mods_doc;
-  exit(1);
-
   if(is_null($object_id)) {
+
+    echo 'trace';
+    exit(1);
 
     $path_item_id = $item_id;
     if(preg_match('/\d{5}/', $path_item_id)) {
@@ -51,10 +55,7 @@ function drush_islandora_dss_islandora_metadb_mods_ingest($project_name, $item_i
     if($mods_ds and $mods_ds->controlGroup != 'X') {
 
       $object->purgeDatastream($mods_ds);
-      //unset($mods_ds);
-      //$mods_ds = NULL;
       $mods_ds = FALSE;
-      //$mods_ds = $object->constructDatastream('MODS', 'X');
     }
 
     $ds_label = preg_replace('/\-/', '_', $project_name) . preg_replace('/\-/', '_', $item_id) . '_MODS';
