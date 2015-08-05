@@ -544,7 +544,7 @@ function islandora_dss_generate_citation_aliases($collection='East Asia Image Co
  */
 function islandora_dss_purge_islandora_paths($coll_pid, $solr_host = 'localhost') {
 
-  $solr = new Apache_Solr_Service($solr_host, 8080, 'solr/fedora_5' . '/');
+  $solr = new Apache_Solr_Service($solr_host, 8080, 'solr/fedora' . '/');
 
   $EASTASIA_RELATION_MAP = array('East Asia Image Collection' => 'eastasia',
 				 'Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
@@ -628,12 +628,32 @@ function islandora_dss_generate_islandora_path($subcollection, $member, $doc = N
      * Handling for members of the Shakespeare Bulletin Archive
      *
      */
+    // Collision for Shakespeare on Film Newsletter1993-04-01T00:00:00Z
+
+    $pub_title = $doc['MODS.mods.relatedItem.titleInfo.title_ss'];
     $date_issued_stamps = $doc['MODS.mods.originInfo.dateIssued.w3cdtf_dt'];
     $date_issued_stamp = array_shift($date_issued_stamps);
-
     $date_issued = new DateTime($date_issued_stamp);
 
-    $alias = 'collections/sbarchive/' . $date_issued->format('Ymd');
+    if($pub_title == 'Shakespeare on Film Newsletter') {
+
+      if($date_issued_stamp == '1993-04-01T00:00:00Z') {
+
+	if($member->id == 'shakespeare:61') {
+
+	  $alias = 'collections/sfnl/' . $date_issued->format('Ymd') . 'a';
+	} else {
+
+	  $alias = 'collections/sfnl/' . $date_issued->format('Ymd') . 'b';
+	}
+      } else {
+
+	$alias = 'collections/sfnl/' . $date_issued->format('Ymd');
+      }
+    } elseif($pub_title == 'Shakespeare Bulletin') {
+
+      $alias = 'collections/sb/' . $date_issued->format('Ymd');
+    }
 
     // Generate the path for the PDF datastream
     $pdf_alias = $alias . '/pdf';
@@ -733,7 +753,7 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
   try {
 
     $solr_query = "cdm.Relation.IsPartOf:\"$coll_pid\"";
-    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf dc.date.sort MODS.mods.originInfo.dateIssued.w3cdtf_dt', 'sort' => 'dc.title asc'));
+    $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf dc.date.sort MODS.mods.originInfo.dateIssued.w3cdtf_dt MODS.mods.relatedItem.titleInfo.title_ss', 'sort' => 'dc.title asc'));
   } catch (Exception $e) {
 
     drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
@@ -750,15 +770,12 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
 
       islandora_dss_generate_islandora_path($subcollection, $member, $solr_doc);
 
-      // Is there a back for these images?
-      drush_log("Successfully generated the path {$path['alias']} for {$solr_doc['PID']}", 'success');
-
+      drush_log(dt("Successfully generated the path !alias for !pid", array('!alias' => $path['alias'], '!pid' => $solr_doc['PID'])), 'success');
     } catch(Exception $e) {
 
-      drush_log("Failure: {$e->getMessage()}", 'error');
+      drush_log(dt("Failure: !message", array('!message' => $e->getMessage())), 'error');
     }
   }
-
 }
 
 /**

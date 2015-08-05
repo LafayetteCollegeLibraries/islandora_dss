@@ -29,6 +29,7 @@ require_once dirname(__DIR__) . '/islandora_dss/includes/contentdm.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/metadb.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/east_asia.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/mdl_prints.drush.inc';
+require_once dirname(__DIR__) . '/islandora_dss/includes/historical.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/newspaper.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/islandora_solr.drush.inc';
 require_once dirname(__DIR__) . '/islandora_dss/includes/yohe.drush.inc';
@@ -553,7 +554,6 @@ function islandora_dss_drush_command() {
    * Marquis de Lafayette Prints Collection tasks
    *
    */
-  //module_load_include('drush.inc', 'islandora_dss', 'includes/mdl_prints');
 
   $items['islandora-mdl-prints-ingest'] =
     array('description' => dt('Ingest a master TIFF file into an Islandora Large Image Object for the Marquis de Lafayette Prints Collection'),
@@ -564,6 +564,18 @@ function islandora_dss_drush_command() {
 	  'aliases' => array());
 
   $items['islandora-mdl-prints-derive-jpeg'] =
+    array('description' => dt(''),
+	  'aliases' => array());
+
+  $items['islandora-mdl-prints-validate'] =
+    array('description' => dt(''),
+	  'aliases' => array());
+
+  /**
+   * Lafayette Historical Photograph Collection tasks
+   *
+   */
+  $items['islandora-historical-validate'] =
     array('description' => dt(''),
 	  'aliases' => array());
 
