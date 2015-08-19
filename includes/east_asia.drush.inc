@@ -109,14 +109,14 @@ function drush_islandora_dss_islandora_tjwar_path_alias() {
  * @see islandora_ingest_form_prepare_new_object()
  *
  */
-function drush_islandora_dss_islandora_east_asia_ingest($front_file_path, $label, $collection, $back_file_path = NULL, $book_pid = NULL) {
+function drush_islandora_dss_islandora_east_asia_ingest($front_file_path, $label, $collection, $back_file_path = NULL, $book_pid = NULL, $namespace_prefix = 'eastAsia') {
 
   $segments = preg_split('/\-/', $collection);
 
   $namespace = array_shift($segments);
   $namespace .= implode('', array_map('ucfirst', $segments));
 
-  $collections = array('islandora:' . $collection);
+  $collections = array($namespace_prefix . ':' . $namespace);
 
   // Get the connection
   $connection = islandora_get_tuque_connection(user_load(1));
@@ -166,7 +166,7 @@ function drush_islandora_dss_islandora_east_asia_ingest($front_file_path, $label
 }
 
 /**
- *
+ * Migrate MetaDB Projects into an Islandora Collection
  * 
  *
  */
@@ -186,7 +186,7 @@ function drush_islandora_dss_islandora_east_asia_migrate_project($project_name, 
   $pg_dbname = 'metadb';
   $pg = new PDO("pgsql:host=$pg_host;port=" . (string) $pg_port . ";dbname=$pg_dbname;", $pg_user, $pg_password);
 
-  $sql = "select item_number,fullsize_file_name from items where project_name='$project_name'";
+  $sql = "select item_number,fullsize_file_name from items where project_name='$project_name' order by item_number";
 
   if(!is_null($max)) {
 
@@ -199,6 +199,8 @@ function drush_islandora_dss_islandora_east_asia_migrate_project($project_name, 
     if(!isset($subset) or in_array((int) $item_number, $subset)) {
 
       drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $item_number, $pg_host);
+
+      exit(1);
     }
   }
 }
@@ -235,6 +237,8 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
 
   $project_name_collection_map = array(
 				       'imperial-postcards' => 'Imperial Postcard Collection',
+				       'imperial-postcards-1000' => 'Imperial Postcard Collection',
+				       'imperial-postcards-1500' => 'Imperial Postcard Collection',
 				       'tjwar-postcards' => 'Taroko-Japan War'
 				       );
   $collection = $project_name_collection_map[$project_name];
@@ -300,6 +304,13 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
     $item_num = $item_id;
   }
 
+  // Extended for "split projects" such as imperial-postcards-1000
+  // Resolves DSS-538
+  if( preg_match('/(.+)?\-\d{4}$/', $project_name, $project_name_match) ) {
+
+    $project_name = $project_name_match[1];
+  }
+
   $file_path = $dir_path . '/mnt/smb/images/projects/master/MetaDB/' . $project_name . '/lc-spcol-' . $project_name . '-' . $item_num . '.tif';
 
   foreach($mods_doc->doc->titleInfo->title as $title) {
@@ -312,6 +323,7 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
     }
   }
 
+  // Ingest the new Object
   if( !isset( $east_asia_postcard ) ) {
 
     $east_asia_postcard = drush_islandora_dss_islandora_east_asia_ingest($file_path, $label, $project_name);

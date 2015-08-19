@@ -11,6 +11,8 @@
 class MetaDbModsFactory {
 
   public static $METADB_PROJECT_NAMES = array('imperial-postcards' => 'east-asia',
+					      'imperial-postcards-1000' => 'east-asia',
+					      'imperial-postcards-1500' => 'east-asia',
 					      'warner-negs-taiwan' => 'east-asia',
 					      'tjwar-postcards' => 'east-asia',
 					      );
