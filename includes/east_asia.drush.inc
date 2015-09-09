@@ -199,8 +199,6 @@ function drush_islandora_dss_islandora_east_asia_migrate_project($project_name, 
     if(!isset($subset) or in_array((int) $item_number, $subset)) {
 
       drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $item_number, $pg_host);
-
-      exit(1);
     }
   }
 }
@@ -239,7 +237,8 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
 				       'imperial-postcards' => 'Imperial Postcard Collection',
 				       'imperial-postcards-1000' => 'Imperial Postcard Collection',
 				       'imperial-postcards-1500' => 'Imperial Postcard Collection',
-				       'tjwar-postcards' => 'Taroko-Japan War'
+				       'tjwar-postcards' => 'Taroko-Japan War',
+				       'pacwar-postcards' => 'Pacific War Postcard Collection'
 				       );
   $collection = $project_name_collection_map[$project_name];
 
@@ -323,6 +322,9 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
     }
   }
 
+  echo $file_path;
+  exit(1);
+
   // Ingest the new Object
   if( !isset( $east_asia_postcard ) ) {
 
@@ -354,9 +356,97 @@ function drush_islandora_dss_islandora_east_asia_mods_migrate($project_name, $it
   }
 }
 
+/**
+ * Link all Book member Objects to a single Page Object as a back page
+ *
+ */
+function drush_islandora_dss_islandora_east_asia_collection_link_page($collection_name, $page_pid,
+								      $solr_host = 'localhost',
+								      $solr_port = 8080,
+								      $solr_path = 'solr/fedora') {
+
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+
+  $solr = new Apache_Solr_Service($solr_host, $solr_port, $solr_path . '/');
+  $index = new IslandoraSolrIndex($solr);
+
+  $solr_query = "cdm.Relation.IsPartOf:\"$collection_name\"";
+  $solr_results = $index->search($solr_query, array('fl' => 'PID dc.title', 'sort' => 'dc.title asc'));
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    $book = islandora_object_load($solr_doc['PID']);
+
+    // Determine whether or not the back has been ingested
+    $pages = islandora_paged_content_get_pages($book);
+    if( count($pages) > 1 ) {
+
+      drush_log(dt("!book_pid already has 2 pages appended", array('!book_pid' => $book->id)), 'ok');
+      continue;
+    }
+
+    $page = islandora_object_load($page_pid);
+
+    drush_log(dt("Appending the Page !page_pid for !book_pid...", array('!page_pid' => $page_pid, '!book_pid' => $book->id)), 'ok');
+
+    $language = 'en-US';
+    $rels_ext = $page->relationships;
+
+    $num_pages = count($pages) + 1;
+    /*
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
+    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
+    islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
+    islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
+    */
+    //function islandora_paged_content_set_relationship(FedoraRelationships $relationships, $predicate_uri, $predicate, $object, $literal = FALSE) {
+    //$relationships->remove($predicate_uri, $predicate, NULL, $literal);
+    $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
+    $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id, FALSE);
+    $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
+    $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
+    $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
+    $rels_ext->add(FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id, FALSE);
+    $rels_ext->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel', FALSE);
+
+    drush_log(dt("Appended the Page !page_pid for !book_pid", array('!page_pid' => $page_pid, '!book_pid' => $book->id)), 'success');
+  }
+}
+
+function drush_islandora_dss_islandora_east_asia_collection_unlink_page($book_pid, $page_pid) {
+
+  $book = islandora_object_load($book_pid);
+
+  $page = islandora_object_load($page_pid);
+  $rels_ext = $page->relationships;
+
+  drush_log(dt("Unlinking the Page !page_pid for !book_pid...", array('!page_pid' => $page_pid, '!book_pid' => $book->id)), 'ok');
+
+  //$rels_ext->add(ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
+  $rels_ext->remove(ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id, FALSE);
+  //$rels_ext->remove(ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
+  //$rels_ext->remove(ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
+  //$rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
+  $rels_ext->remove(FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id, FALSE);
+  //$rels_ext->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel', FALSE);
+
+  drush_log(dt("Unlinked the Page !page_pid for !book_pid", array('!page_pid' => $page_pid, '!book_pid' => $book->id)), 'success');
+}
+
 function drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, $coll_prefix, $start = 1, $end = 10000) {
 
-  foreach(file_scan_directory($dir_path, '/\.jpg/') as $file) {
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  $files = file_scan_directory($dir_path, '/\.jpg/');
+  //$files = file_scan_directory($dir_path, '/\.tif/');
+  ksort($files);
+
+  foreach($files as $file) {
 
     // Parse the 
     preg_match('/\-(\d{4})/', $file->uri, $m);
@@ -387,8 +477,20 @@ FILTER regex(?title, "' . $metadb_id . '") .
     $subject = array_shift($results);
 
     $book_pid = $subject['subject']['value'];
+    //$book_pid = 'imperialPostcards:888';
+    $book_object = islandora_object_load($book_pid);
+    //$book_object = islandora_object_load('imperialPostcards:888');
+    
+    // Determine whether or not the back has been ingested
+    $pages = islandora_paged_content_get_pages($book_object);
+    if( count($pages) > 1 ) {
+
+      drush_log(dt("!book_pid already has 2 pages appended", array('!book_pid' => $book_pid)), 'ok');
+      continue;
+    }
 
     drush_log("Ingesting {$file->uri} and appending it to $book_pid...", 'ok');
+
     islandora_dss_book_page_ingest($file, $book_pid);
   }
 }

@@ -15,6 +15,7 @@ class MetaDbModsFactory {
 					      'imperial-postcards-1500' => 'east-asia',
 					      'warner-negs-taiwan' => 'east-asia',
 					      'tjwar-postcards' => 'east-asia',
+					      'pacwar-postcards' => 'east-asia'
 					      );
 
   /**
