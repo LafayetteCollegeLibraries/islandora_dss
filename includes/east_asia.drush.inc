@@ -36,6 +36,68 @@ function drush_islandora_dss_islandora_east_asia_mods_export($object_pid,
   
 }
 
+function drush_islandora_dss_islandora_east_asia_update_obj(
+							    $collection_name,
+							    $project_name,
+							    $solr_host = 'localhost',
+							    $solr_port = 8080,
+							    $solr_path = 'solr/fedora') {
+  
+  $tuque = islandora_get_tuque_connection(user_load(1));
+  
+  $project = new DssMetaDbProject($project_name);
+  $records = new DssMetaDbRecordSet($project);
+
+  $solr = new Apache_Solr_Service($solr_host, $solr_port, $solr_path . '/');
+  $index = new IslandoraSolrIndex($solr);
+
+  $solr_query = "cdm.Relation.IsPartOf:\"$collection_name\"";
+  $solr_results = $index->search($solr_query, array('fl' => 'PID dc.title', 'sort' => 'dc.title asc'));
+
+  foreach($solr_results['response']['docs'] as $solr_doc) {
+
+    $object = islandora_object_load($solr_doc['PID']);
+
+    preg_match('/\[[a-z]{2}(\d{4})\]/', $object->label, $object_label_match);
+
+    //print_r($object_label_match);
+    $item_num = $object_label_match[1];
+
+    $file_path = '/mnt/smb/images/projects/master/MetaDB/' . $project_name . '/lc-spcol-' . $project_name . '-' . $item_num . '.tif';
+
+    // Update the TIFF datastream
+    
+    // Retrieve the first Page of the Object
+    module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+    // islandora_solution_pack_large_image/includes/derivatives.inc
+    module_load_include('inc', 'islandora_large_image', 'includes/derivatives');
+
+    $pages = islandora_paged_content_get_pages($object);
+
+    $front_page = array_shift($pages);
+    $front_page = islandora_object_load($front_page['pid']);
+
+    // Regenerate the derivatives
+    drush_log("Generating the derivatives for {$object->id}...", 'ok');
+
+    // Regenerate the JPEG2000 derivative from the TIFF
+    $base_name = str_replace(':', '-', $front_page->id);
+    $uploaded_file = islandora_large_image_get_uploaded_file($front_page, $base_name);
+
+    $derivative_file = islandora_large_image_imagemagick_convert($uploaded_file, "temporary://{$base_name}_JP2.jp2", islandora_large_image_get_args());
+    file_unmanaged_delete($uploaded_file);
+
+    //islandora_large_image_add_datastream($front_page, 'JP2', $derivative_file, 'image/jp2', t('JPEG 2000'));
+    $jp2_ds = $front_page['JP2'];
+    $jp2_ds->setContentFromFile($derivative_file);
+
+    file_unmanaged_delete($derivative_file);
+    islandora_paged_content_update_paged_content_thumbnail($object);
+    drush_log("Generated the derivatives for {$object->id}", 'success');
+  }
+}
+
 /**
  * Export a MetaDB Items from the East Asia Image Collection into Islandora
  *
@@ -395,17 +457,6 @@ function drush_islandora_dss_islandora_east_asia_collection_link_page($collectio
     $rels_ext = $page->relationships;
 
     $num_pages = count($pages) + 1;
-    /*
-    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
-    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id);
-    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
-    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
-    islandora_paged_content_set_relationship($rels_ext, ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
-    islandora_paged_content_set_relationship($rels_ext, FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id);
-    islandora_paged_content_set_relationship($rels_ext, FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel');
-    */
-    //function islandora_paged_content_set_relationship(FedoraRelationships $relationships, $predicate_uri, $predicate, $object, $literal = FALSE) {
-    //$relationships->remove($predicate_uri, $predicate, NULL, $literal);
     $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
     $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id, FALSE);
     $rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
@@ -427,13 +478,8 @@ function drush_islandora_dss_islandora_east_asia_collection_unlink_page($book_pi
 
   drush_log(dt("Unlinking the Page !page_pid for !book_pid...", array('!page_pid' => $page_pid, '!book_pid' => $book->id)), 'ok');
 
-  //$rels_ext->add(ISLANDORA_RELS_EXT_URI, 'hasLanguage', $language, TRUE);
   $rels_ext->remove(ISLANDORA_RELS_EXT_URI, 'isPageOf', $book->id, FALSE);
-  //$rels_ext->remove(ISLANDORA_RELS_EXT_URI, 'isSequenceNumber', (string) $num_pages, TRUE);
-  //$rels_ext->remove(ISLANDORA_RELS_EXT_URI, 'isPageNumber', (string) $num_pages, TRUE);
-  //$rels_ext->add(ISLANDORA_RELS_EXT_URI, 'isSection', '1', TRUE);
   $rels_ext->remove(FEDORA_RELS_EXT_URI, 'isMemberOf', $book->id, FALSE);
-  //$rels_ext->add(FEDORA_MODEL_URI, 'hasModel', 'islandora:pageCModel', FALSE);
 
   drush_log(dt("Unlinked the Page !page_pid for !book_pid", array('!page_pid' => $page_pid, '!book_pid' => $book->id)), 'success');
 }
@@ -443,7 +489,6 @@ function drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, $coll_prefix
   module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
 
   $files = file_scan_directory($dir_path, '/\.jpg/');
-  //$files = file_scan_directory($dir_path, '/\.tif/');
   ksort($files);
 
   foreach($files as $file) {
@@ -477,9 +522,7 @@ FILTER regex(?title, "' . $metadb_id . '") .
     $subject = array_shift($results);
 
     $book_pid = $subject['subject']['value'];
-    //$book_pid = 'imperialPostcards:888';
     $book_object = islandora_object_load($book_pid);
-    //$book_object = islandora_object_load('imperialPostcards:888');
     
     // Determine whether or not the back has been ingested
     $pages = islandora_paged_content_get_pages($book_object);
@@ -498,4 +541,89 @@ FILTER regex(?title, "' . $metadb_id . '") .
 function drush_islandora_dss_islandora_east_asia_ingest_imperial_postcards_backs($start = 1, $end = 10000, $dir_path = '/mnt/smb/images/projects/master/other/imperial-postcards/backs/jpeg/') {
 
   return drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, 'ip', $start, $end);
+}
+
+function drush_islandora_dss_islandora_east_asia_tn_paths_generate(
+								   //$collection_name,
+								   $solr_host = 'localhost',
+								   $solr_port = 8080,
+								   $solr_path = 'solr/fedora') {
+
+  /*
+ 			      'Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
+			      'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
+			      'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
+			      'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
+			      'Sino-Japanese War Postcard Album 01' => 'eastasia/pa-omitsu01',
+			      'Sino-Japanese War Postcard Album 02' => 'eastasia/pa-omitsu02',
+			      'Lin Chia-Feng Family Postcard Collection' => 'eastasia/lin-postcards',
+			      'Japanese History Study Cards' => 'eastasia/japan-study-cards',
+			      'Pacific War Postcard Collection' => 'eastasia/pacwar-postcards',
+			      'Michael Lewis Taiwan Postcard Collection' => 'eastasia/lewis-postcards',
+			      'Gerald & Rella Warner Taiwan Postcard Collection' => 'eastasia/warner-postcards',
+			      'Gerald & Rella Warner Dutch East Indies Negative Collection' => 'eastasia/warner-negs-indonesia',
+			      'Gerald & Rella Warner Manchuria Negative Collection' => 'eastasia/warner-negs-manchuria',
+			      'Gerald & Rella Warner Taiwan Negative Collection' => 'eastasia/warner-negs-taiwan',
+			      'Gerald & Rella Warner Japan Slide Collection' => 'eastasia/warner-slides-japan',
+			      'Gerald & Rella Warner Souvenirs of Beijing and Tokyo' => 'eastasia/warner-souvenirs',
+			      'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
+			      'Scenic Taiwan' => 'eastasia/cpw-nofuko',
+			      'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
+			      'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/truku'
+   */
+
+  // This should be abstracted
+  $east_asia_collections = array('Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
+				 'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
+				 'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
+				 'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
+				 'Sino-Japanese War Postcard Album 01' => 'eastasia/pa-omitsu01',
+				 'Sino-Japanese War Postcard Album 02' => 'eastasia/pa-omitsu02',
+				 'Lin Chia-Feng Family Postcard Collection' => 'eastasia/lin-postcards',
+				 'Japanese History Study Cards' => 'eastasia/japan-study-cards',
+				 'Pacific War Postcard Collection' => 'eastasia/pacwar-postcards',
+				 'Michael Lewis Taiwan Postcard Collection' => 'eastasia/lewis-postcards',
+				 'Gerald & Rella Warner Taiwan Postcard Collection' => 'eastasia/warner-postcards',
+				 'Gerald & Rella Warner Dutch East Indies Negative Collection' => 'eastasia/warner-negs-indonesia',
+				 'Gerald & Rella Warner Manchuria Negative Collection' => 'eastasia/warner-negs-manchuria',
+				 'Gerald & Rella Warner Taiwan Negative Collection' => 'eastasia/warner-negs-taiwan',
+				 'Gerald & Rella Warner Japan Slide Collection' => 'eastasia/warner-slides-japan',
+				 'Gerald & Rella Warner Souvenirs of Beijing and Tokyo' => 'eastasia/warner-souvenirs',
+				 'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
+				 'Scenic Taiwan' => 'eastasia/cpw-nofuko',
+				 'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
+				 'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/truku'
+				 );
+
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+
+  $solr = new Apache_Solr_Service($solr_host, $solr_port, $solr_path . '/');
+  $index = new IslandoraSolrIndex($solr);
+
+  foreach(array_keys($east_asia_collections) as $collection_name) {
+
+    $solr_query = "cdm.Relation.IsPartOf:\"$collection_name\"";
+    $solr_results = $index->search($solr_query, array('fl' => 'PID dc.title', 'sort' => 'dc.title asc'));
+    
+    foreach($solr_results['response']['docs'] as $solr_doc) {
+      
+      $member = islandora_object_load($solr_doc['PID']);
+      
+      $object_path_alias = drupal_get_path_alias("islandora/object/{$member->id}");
+      
+      // Generate the path alias for the OBJ datastream
+      $path = array('source' => "islandora/object/{$member->id}/datastream/TN/view",
+		    'alias' => "$object_path_alias/thumbnail");
+      
+      drush_log(dt('Generating the path for the TN Datastream appended to !object_id', array('!object_id' => $member->id)), 'ok');
+      
+      path_delete($path);
+      path_save($path);
+      
+      drush_log(dt('Successfully generated the path !path for the TN Datastream appended to !object_id', array('!path' => $path['alias'],
+													       '!object_id' => $member->id)), 'success');
+    }
+  }
 }

@@ -523,6 +523,12 @@ function islandora_dss_drush_command() {
     array(
 	  'description' => dt(''), //@todo Implement
 	  'aliases' => array());
+
+  $items['islandora-east-asia-update-obj'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
+
   $items['islandora-east-asia-mods-export-collection'] =
     array(
 	  'description' => dt(''), //@todo Implement
@@ -542,13 +548,30 @@ function islandora_dss_drush_command() {
     array(
 	  'description' => dt(''), //@todo Implement
 	  'aliases' => array());
+  $items['islandora-eaic-ingest-pages'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
 
   $items['islandora-east-asia-ingest-imperial-postcards-backs'] =
     array(
 	  'description' => dt(''),
 	  'aliases' => array());
 
+  $items['islandora-east-asia-collection-link-page'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
 
+  $items['islandora-east-asia-collection-unlink-page'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
+
+  $items['islandora-east-asia-tn-paths-generate'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
 
   /**
    * Marquis de Lafayette Prints Collection tasks
@@ -604,6 +627,11 @@ function islandora_dss_drush_command() {
     array(
 	  'description' => dt(''),
 	  'aliases' => array('newspaper-ingest'));
+
+  $items['islandora-book-newspaper-update'] =
+    array(
+	  'description' => dt(''),
+	  'aliases' => array('newspaper-update'));
 
   $items['islandora-book-newspaper-append-mods-xml'] =
     array(
@@ -678,11 +706,25 @@ function islandora_dss_drush_command() {
 			       ),
 	  'aliases' => array());
 
+  $items['islandora-book-alumni-report-ingested'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array('arg1' => dt(''),
+			       'arg2' => dt(''),
+			       ),
+	  'aliases' => array());
+
   /**
    * Shakespeare Bulletin Archive Tasks
    *
    */
   $items['islandora-book-shakespeare-ingest-collection'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array(),
+	  'aliases' => array());
+
+  $items['islandora-book-shakespeare-ingest-metadata'] =
     array(
 	  'description' => dt(''), //! @todo Implement
 	  'arguments' => array(),
@@ -776,6 +818,14 @@ function islandora_dss_drush_command() {
   //module_load_include('drush.inc', 'islandora_dss', 'includes/islandora_solr');
 
   $items['islandora-solr-update-collection'] =
+    array(
+	  'description' => dt('Update the Solr index for any given collection'),
+	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
+			       'arg2' => dt('Fedora Generic Search user password')),
+	  'examples' => array('Standard example' => 'islandora-solr-update-collection "Marquis de Lafayette Prints Collection"'),
+	  'aliases' => array(''));
+
+  $items['islandora-solr-update-set'] =
     array(
 	  'description' => dt('Update the Solr index for any given collection'),
 	  'arguments' => array('arg1' => dt('cdm.Relation.IsPartOf value(s)'),
