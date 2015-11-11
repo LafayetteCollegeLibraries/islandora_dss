@@ -468,7 +468,7 @@ function drush_islandora_dss_islandora_book_alumni_ingest($file_name,
  * Resolves DSSSM-1146
  *
  */
-function drush_islandora_dss_islandora_book_alumni_ingest_pdf($pdf_dir_path = '/mnt/smb/dss/dss-production/Lafayette_AlumniPubs_13-117_final_delivery/PDFs_Consolidated/reduced_150ppi') {
+function drush_islandora_dss_islandora_book_alumni_ingest_pdf($pdf_dir_path = '/mnt/smb/dss/dss-production/Lafayette_AlumniPubs_13-117_final_delivery/PDFs_Consolidated/Lafayette_PDFs_ABBYY_10/150ppi') {
 
   $connection = islandora_get_tuque_connection(user_load(1));
 
@@ -483,38 +483,102 @@ function drush_islandora_dss_islandora_book_alumni_ingest_pdf($pdf_dir_path = '/
   $pdf_files = array();
   foreach($pdf_files_iter as $file_path => $value) {
 
-    //print $file_path . "\n";
-
     # lafalummag_19401000.pdf
     preg_match('/\/([0-9a-zA-Z_]+)\.pdf$/', $file_path, $m);
     $path_alias_segment = $m[1];
     $path_alias_segment = preg_replace('/_/', '-', $path_alias_segment);
-    
-    // https://digital.stage.lafayette.edu/collections/magazine/lafalummag-19380200
     $path_alias = "collections/magazine/" . $path_alias_segment;
-
-    //print $path_alias . "\n";
-
     $path = drupal_get_normal_path($path_alias);
-    //print $path . "\n";
 
-    // preg_match('/\/([az]+\:\d+)$/', $path, $pid_match);
-    preg_match('/([a-z]+\:\d+)$/', $path, $pid_match);
-    $pid = $pid_match[1];
+    if(preg_match('/([a-z]+\:\d+)$/', $path, $pid_match)) {
 
-    //print $pid . "\n";
+      $pid = $pid_match[1];
+    } else {
+
+      drush_log(dt('Failed to parse the PID from the file path !pdf_file...', array('!pdf_file' => $file_path)), 'error');
+      continue;
+    }
 
     $book = islandora_object_load($pid);
     drush_log(dt('Ingesting the PDF !pdf_file into the OBJ Datastream for !obj_pid...', array('!pdf_file' => $file_path,
 											      '!obj_pid' => $book->id)), 'ok');
 
+    if(!$book) {
+
+      drush_log(dt('Failed to load the Object !pid...', array('!pid' => $pid)), 'error');
+      continue;
+    }
+
     // Retrieve the Islandora Object
     $ds_obj = $book['OBJ'];
-    $ds_obj->setContentFromFile($file_path);
-    drush_log(dt('Ingested the PDF !pdf_file into the OBJ Datastream for !obj_pid...', array('!pdf_file' => $file_path,
-											     '!obj_pid' => $book->id)), 'success');
+    if( md5($ds_obj->content) != md5_file($file_path) ) {
 
+      $ds_obj->setContentFromFile($file_path);
+      drush_log(dt('Ingested the PDF !pdf_file into the OBJ Datastream for !obj_pid...', array('!pdf_file' => $file_path,
+											       '!obj_pid' => $book->id)), 'success');
+    }
+  }
+}
+
+/**
+ * Reporting task for members of the "Magazine Collection"
+ *
+ */
+
+function drush_islandora_dss_islandora_book_alumni_report_ingested($tiff_dir_path) {
+
+  $connection = islandora_get_tuque_connection(user_load(1));
+  $session = new IslandoraSession($connection);
+
+  $tiff_dir = new RecursiveDirectoryIterator($tiff_dir_path);
+  $tiff_iter = new RecursiveIteratorIterator($tiff_dir);
+  $tiff_files = new RegexIterator($tiff_iter, '/^.+\.tif$/i', RecursiveRegexIterator::GET_MATCH);
+
+  foreach($tiff_files as $i => $tiff_file_path) {
+
+    preg_match('/([a-z]+_\d+[a-zA-Z]*)_\d+\.tif/', $i, $m);
+    $label = $m[0];
+    $book_label = $m[1];
+
+    drush_log(dt('Retrieving the Book Object for !book_label...', array('!book_label' => $book_label)), 'ok');
+
+    // Retrieve the Book Object by its label
+    $books = $session->get_objects($book_label);
+
+      $book = array_shift($books);
+
+      drush_log(dt('Retrieving the Page Object for !tiff_file_path...', array('!tiff_file_path' => $i)), 'ok');
     
+      // Retrieve the Page Object by its label
+      $pages = $session->get_objects($i);
+    
+      if(empty($pages)) {
+ 
+	drush_log(dt('Failed to retrieve the Page Object for !tiff_file_path', array('!tiff_file_path' => $i)), 'error');
+	exit(1);
+      } else {
+
+	drush_log(dt('Retrieved the Page Object for !tiff_file_path', array('!tiff_file_path' => $i)), 'success');
+	$page = array_shift($pages);
+
+	$obj_ds = $page['OBJ'];
+
+	$obj_md5 = md5($obj_ds->content);
+	$tiff_file_md5 = md5_file($i);
+
+	if($obj_md5 != $tiff_file_md5) {
+
+	  drush_log(dt('The Page Object for !object_id appears to have been corrupted for !tiff_file_path', array('!object_id' => $page->id,
+														  '!tiff_file_path' => $i)), 'error');
+	  /*
+	} else {
+	  
+	  drush_log(dt('The Page Object for !object_id appears to have been ingested for !tiff_file_path', array('!object_id' => $page->id,
+														  '!tiff_file_path' => $i)), 'success');
+	  exit(1);
+	  */
+	}	
+      }
   }
 }
 
@@ -548,22 +612,6 @@ function drush_islandora_dss_islandora_book_alumni_ingest_set($tiff_dir_path,
     preg_match('/([a-z]+_\d+[a-zA-Z]*)_\d+\.tif/', $i, $m);
     $label = $m[0];
     $book_label = $m[1];
-
-    /*
-    if(preg_match('/lafalummag/', $book_label)) {
-
-      continue;
-    }
-    */
-
-    //! @todo Terrible; Refactor
-    /*
-    if($index < $start) {
-
-      $index++;
-      continue;
-    }
-    */
 
     // Retrieve the Book Object by its label
     $books = $session->get_objects($book_label);

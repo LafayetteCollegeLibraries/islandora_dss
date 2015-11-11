@@ -543,34 +543,164 @@ function drush_islandora_dss_islandora_east_asia_ingest_imperial_postcards_backs
   return drush_islandora_dss_islandora_eaic_ingest_pages($dir_path, 'ip', $start, $end);
 }
 
-function drush_islandora_dss_islandora_east_asia_tn_paths_generate(
-								   //$collection_name,
-								   $solr_host = 'localhost',
+function drush_islandora_dss_islandora_east_asia_tn_sample($solr_host = 'localhost',
+							   $solr_port = 8080,
+							   $solr_path = 'solr/fedora') {
+
+  // This should be abstracted
+  $east_asia_collections = array('Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
+				 'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
+				 'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
+				 'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
+				 'Sino-Japanese War Postcard Album 01' => 'eastasia/pa-omitsu01',
+				 'Sino-Japanese War Postcard Album 02' => 'eastasia/pa-omitsu02',
+				 'Lin Chia-Feng Family Postcard Collection' => 'eastasia/lin-postcards',
+				 'Japanese History Study Cards' => 'eastasia/japan-study-cards',
+				 'Pacific War Postcard Collection' => 'eastasia/pacwar-postcards',
+				 'Michael Lewis Taiwan Postcard Collection' => 'eastasia/lewis-postcards',
+				 'Gerald & Rella Warner Taiwan Postcard Collection' => 'eastasia/warner-postcards',
+				 'Gerald & Rella Warner Dutch East Indies Negative Collection' => 'eastasia/warner-negs-indonesia',
+				 'Gerald & Rella Warner Manchuria Negative Collection' => 'eastasia/warner-negs-manchuria',
+				 'Gerald & Rella Warner Taiwan Negative Collection' => 'eastasia/warner-negs-taiwan',
+				 'Gerald & Rella Warner Japan Slide Collection' => 'eastasia/warner-slides-japan',
+				 'Gerald & Rella Warner Souvenirs of Beijing and Tokyo' => 'eastasia/warner-souvenirs',
+				 'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
+				 'Scenic Taiwan' => 'eastasia/cpw-nofuko',
+				 'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
+				 'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/truku'
+				 );
+
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+
+  $solr = new Apache_Solr_Service($solr_host, $solr_port, $solr_path . '/');
+  $index = new IslandoraSolrIndex($solr);
+
+  foreach(array_keys($east_asia_collections) as $collection_name) {
+    
+    $solr_query = "cdm.Relation.IsPartOf:\"$collection_name\"";
+    $solr_results = $index->search($solr_query, array('fl' => 'PID dc.title', 'sort' => 'dc.title asc'));
+
+    $solr_docs = $solr_results['response']['docs'];
+    $solr_docs_count = count($solr_results['response']['docs']);
+
+    $sampled_docs = array();
+    
+    // Retrieve the first 1/3 (beginning)
+    // Generate a random of 8
+    for($j=0;$j<3;$j++) {
+      
+      for($k=0;$k<9;$k++) {
+
+	$solr_doc_index = mt_rand($j * $solr_docs_count / 3, ($j + 1) * $solr_docs_count / 3);
+
+	if($solr_doc_index < $solr_docs_count) {
+	  $sampled_docs[] = $solr_docs[$solr_doc_index];
+	}
+      }
+    }
+    
+    foreach($sampled_docs as $solr_doc) {
+    //for($i=0;$i<25;$i++) {
+      
+      //$solr_doc = $solr_results['response']['docs'][$i];
+      
+      $member = islandora_object_load($solr_doc['PID']);
+
+      $path = drupal_get_path_alias("islandora/object/{$member->id}/datastream/TN/view");
+
+      drush_log(dt('Attempting to retrieve the headers for the thumbnail for !object_id', array('!object_id' => $member->id)), 'ok');
+
+      global $base_url;
+
+      $thumbnail_url = $base_url . '/' . $path;
+
+      $headers = get_headers($thumbnail_url);
+
+      $status = $headers[0];
+      $content_length = $headers[6];
+      $content_type = $headers[8];
+
+      if(!preg_match('/200 OK/', $status)) {
+
+	drush_log(dt('Failed to retrieve the thumbnail for !object_id', array('!object_id' => $member->id)), 'error');
+	exit(1);
+      } elseif(!preg_match('/image/', $content_type)) {
+
+	drush_log(dt('Thumbnail for !object_id does not specify an image media type', array('!object_id' => $member->id)), 'error');
+	exit(1);
+      } else {
+
+	drush_log(dt('Retrieved the headers for the thumbnail for !object_id', array('!object_id' => $member->id)), 'success');
+      }
+    }
+  }
+}
+
+function drush_islandora_dss_islandora_east_asia_tn_mediatype_correct($solr_host = 'localhost',
+								      $solr_port = 8080,
+								      $solr_path = 'solr/fedora') {
+
+  // This should be abstracted
+  $east_asia_collections = array('Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
+				 'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
+				 'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
+				 'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
+				 'Sino-Japanese War Postcard Album 01' => 'eastasia/pa-omitsu01',
+				 'Sino-Japanese War Postcard Album 02' => 'eastasia/pa-omitsu02',
+				 'Lin Chia-Feng Family Postcard Collection' => 'eastasia/lin-postcards',
+				 'Japanese History Study Cards' => 'eastasia/japan-study-cards',
+				 'Pacific War Postcard Collection' => 'eastasia/pacwar-postcards',
+				 'Michael Lewis Taiwan Postcard Collection' => 'eastasia/lewis-postcards',
+				 'Gerald & Rella Warner Taiwan Postcard Collection' => 'eastasia/warner-postcards',
+				 'Gerald & Rella Warner Dutch East Indies Negative Collection' => 'eastasia/warner-negs-indonesia',
+				 'Gerald & Rella Warner Manchuria Negative Collection' => 'eastasia/warner-negs-manchuria',
+				 'Gerald & Rella Warner Taiwan Negative Collection' => 'eastasia/warner-negs-taiwan',
+				 'Gerald & Rella Warner Japan Slide Collection' => 'eastasia/warner-slides-japan',
+				 'Gerald & Rella Warner Souvenirs of Beijing and Tokyo' => 'eastasia/warner-souvenirs',
+				 'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
+				 'Scenic Taiwan' => 'eastasia/cpw-nofuko',
+				 'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
+				 'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/truku'
+				 );
+
+  module_load_include('inc', 'islandora_paged_content', 'includes/utilities');
+
+  $tuque = islandora_get_tuque_connection(user_load(1));
+
+  $solr = new Apache_Solr_Service($solr_host, $solr_port, $solr_path . '/');
+  $index = new IslandoraSolrIndex($solr);
+
+  foreach(array_keys($east_asia_collections) as $collection_name) {
+
+    $solr_query = "cdm.Relation.IsPartOf:\"$collection_name\"";
+    $solr_results = $index->search($solr_query, array('fl' => 'PID dc.title', 'sort' => 'dc.title asc'));
+    
+    foreach($solr_results['response']['docs'] as $solr_doc) {
+      
+      $member = islandora_object_load($solr_doc['PID']);
+
+      $tn_ds = $member['TN'];
+      
+      if($tn_ds->mimetype == 'application/octet-stream') {
+
+	drush_log(dt('Cleaning the media type for the TN Datastream appended to !object_id', array('!object_id' => $member->id)), 'ok');
+
+	$tn_ds->mimetype = 'image/jpeg';
+
+	drush_log(dt('Successfully cleaned the media type for the TN Datastream appended to !object_id', array('!object_id' => $member->id)), 'success');
+      } else {
+
+	drush_log(dt('Cleaning the media type for the TN Datastream appended to !object_id', array('!object_id' => $member->id)), 'ok');
+      }
+    }
+  }
+}
+
+function drush_islandora_dss_islandora_east_asia_tn_paths_generate($solr_host = 'localhost',
 								   $solr_port = 8080,
 								   $solr_path = 'solr/fedora') {
-
-  /*
- 			      'Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',
-			      'T.W. Ingersoll Co. Stereoviews of the Siege of Port Arthur' => 'eastasia/rjw-stereo',
-			      'Imperial Postcard Collection' => 'eastasia/imperial-postcards',
-			      'Tsubokura Russo-Japanese War Postcard Album' => 'eastasia/pa-tsubokura',
-			      'Sino-Japanese War Postcard Album 01' => 'eastasia/pa-omitsu01',
-			      'Sino-Japanese War Postcard Album 02' => 'eastasia/pa-omitsu02',
-			      'Lin Chia-Feng Family Postcard Collection' => 'eastasia/lin-postcards',
-			      'Japanese History Study Cards' => 'eastasia/japan-study-cards',
-			      'Pacific War Postcard Collection' => 'eastasia/pacwar-postcards',
-			      'Michael Lewis Taiwan Postcard Collection' => 'eastasia/lewis-postcards',
-			      'Gerald & Rella Warner Taiwan Postcard Collection' => 'eastasia/warner-postcards',
-			      'Gerald & Rella Warner Dutch East Indies Negative Collection' => 'eastasia/warner-negs-indonesia',
-			      'Gerald & Rella Warner Manchuria Negative Collection' => 'eastasia/warner-negs-manchuria',
-			      'Gerald & Rella Warner Taiwan Negative Collection' => 'eastasia/warner-negs-taiwan',
-			      'Gerald & Rella Warner Japan Slide Collection' => 'eastasia/warner-slides-japan',
-			      'Gerald & Rella Warner Souvenirs of Beijing and Tokyo' => 'eastasia/warner-souvenirs',
-			      'Woodsworth Taiwan Image Collection' => 'eastasia/woodsworth-images',
-			      'Scenic Taiwan' => 'eastasia/cpw-nofuko',
-			      'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
-			      'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/truku'
-   */
 
   // This should be abstracted
   $east_asia_collections = array('Japanese Imperial House Postcard Album' => 'eastasia/pa-koshitsu',

@@ -573,6 +573,16 @@ function islandora_dss_drush_command() {
 	  'description' => dt(''), //@todo Implement
 	  'aliases' => array());
 
+  $items['islandora-east-asia-tn-mediatype-correct'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
+
+  $items['islandora-east-asia-tn-sample'] =
+    array(
+	  'description' => dt(''), //@todo Implement
+	  'aliases' => array());
+
   /**
    * Marquis de Lafayette Prints Collection tasks
    *
@@ -739,6 +749,15 @@ function islandora_dss_drush_command() {
 			      ),
 	  'aliases' => array());
 
+  /**
+   * Board of Trustees Minutes Collection
+   *
+   */
+  $items['islandora-book-trustees-ingest'] =
+    array(
+	  'description' => dt(''), //! @todo Implement
+	  'arguments' => array(),
+	  'aliases' => array());
 
   /**
    * Geology Department Slide Collection tasks

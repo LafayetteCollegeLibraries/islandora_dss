@@ -234,6 +234,7 @@ function drush_islandora_dss_islandora_dc_update($obj_pid, $src_ds_id, $dest_ds_
   $proc->importStyleSheet( $xsl ); // attach the xsl rules
 
   $dest_doc_xml = $proc->transformToXML($doc);
+
   $dest_ds = $object[$dest_ds_id];
   $dest_ds->setContentFromString($dest_doc_xml);
 }

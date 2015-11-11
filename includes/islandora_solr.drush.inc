@@ -91,15 +91,72 @@ function drush_islandora_dss_islandora_solr_update_collection($collection_pid,
 function drush_islandora_dss_islandora_solr_update_set($cdm_collection,
 						       $fedoragsearch_pwd,
 						       $collection_field = 'fgs.isMemberOf',
+						       $solr_host = 'localhost',
 						       $fedoragsearch_url = 'http://localhost:8080/fedoragsearch', $fedoragsearch_user = 'fgsAdmin') {
 
   $result = FALSE;
   $tuque = islandora_get_tuque_connection(user_load(1));
-  $solr_results = islandora_dss_basic_collection_get_objects_solr($cdm_collection, $collection_field);
+
+  //$solr_results = islandora_dss_basic_collection_get_objects_solr($cdm_collection, $collection_field);
+
+  $solr_query = $collection_field . ':"' . $cdm_collection . '" AND -c_foxml.all.text:[* TO *]';
+  $solr = new Apache_Solr_Service($solr_host, 8080, 'solr/fedora' . '/');
+
+  $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID', 'sort' => 'dc.title asc'));
+  //$results = $solr->search($solr_query, 0, 1, array('fl' => 'PID', 'sort' => 'dc.title asc'));
+  $solr_results = json_decode($results->getRawResponse(), TRUE);
 
   foreach($solr_results['response']['docs'] as $solr_doc) {
     
     drush_log("Updating the Document for " . $solr_doc['PID'] . "...", 'ok');
+
+    $object = islandora_object_load($solr_doc['PID']);
+    $mods_ds = $object['MODS'];
+    
+    if($cdm_collection == 'Lafayette Newspaper Collection') {
+
+      $mods_doc = new SimpleXMLElement($mods_ds->content);
+      $mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+
+      $elements = $mods_doc->xpath('//mods:identifier[@type="local"]');
+
+      if(!empty($elements)) {
+
+	// Remove the element
+	$element = array_shift($elements);
+
+	$old_dom = dom_import_simplexml($element);
+
+	$old_dom->parentNode->removeChild($old_dom);
+
+	$mods_ds->setContentFromString($old_dom->ownerDocument->saveXML());
+      }
+    } elseif($cdm_collection == 'Shakespeare Bulletin Archive') {
+
+      $mods_doc = new SimpleXMLElement($mods_ds->content);
+      $mods_doc->registerXPathNamespace('mods', 'http://www.loc.gov/mods/v3');
+
+      $old_mods = $mods_doc->asXml();
+
+      print_r($old_mods);
+
+      $elements = $mods_doc->xpath('//mods:mods/mods:relatedItem/mods:part');
+
+      if(!empty($elements)) {
+
+	// Remove the element
+	$element = array_pop($elements);
+
+	$old_dom = dom_import_simplexml($element);
+
+	$old_dom->parentNode->removeChild($old_dom);
+
+	$new_mods = $old_dom->ownerDocument->saveXML();
+
+	$mods_ds->setContentFromString($new_mods);
+      }
+
+    }
 
     // Build the GET request
     $params = array('operation' => 'updateIndex', 'action' => 'fromPid', 'value' => $solr_doc['PID']);
@@ -115,6 +172,8 @@ function drush_islandora_dss_islandora_solr_update_set($cdm_collection,
     // Transmit the request
     $response = curl_exec($ch);
 
+    //$mods_ds->setContentFromString($old_mods);
+
     // Handle all cURL errors
     if(curl_errno($ch)) {
 
@@ -125,6 +184,11 @@ function drush_islandora_dss_islandora_solr_update_set($cdm_collection,
     }
 
     curl_close($ch);
+
+    // Commit
+    shell_exec("/usr/bin/curl http://crete0.lafayette.edu:8080/solr/fedora/update --data '<commit/>' -H 'Content-type:text/xml; charset=utf-8'");
+
+    exit(1);
   }
 }
 
@@ -280,8 +344,6 @@ function drush_islandora_dss_islandora_solr_add_document($object_id,
 							 $solr_host = 'localhost',
 							 $solr_core_context = 'solr/fedora') {
 
-  
-
   $foxml_file_path = '';
 
   $object_file_name = preg_replace('/\:/', '%3A', $object_id);
@@ -292,42 +354,42 @@ function drush_islandora_dss_islandora_solr_add_document($object_id,
   $foxml_files = new RegexIterator($object_store_iter, "/" . "info%3Afedora%2F" . $object_file_name . "$/i", RecursiveRegexIterator::GET_MATCH);
 
   drush_log( dt('Searching for the FOXML file for !object_pid', array('!object_pid' => $object_id)), 'ok' );
-  foreach($foxml_files as $foxml_file_path => $_file) {
+
+  //foreach($foxml_files as $foxml_file_path => $_file) {
+  //foreach(array("/usr/local/fedora/data/objectStore/b8/info%3Afedora%2FimperialPostcards%3A888") as $foxml_file_path) {
+  foreach(array("/usr/local/fedora/data/objectStore/bd/info%3Afedora%2Fshakespeare%3A45") as $foxml_file_path) {
 
     $solr_add_doc = shell_exec("/usr/bin/env xsltproc " . $xslt_file_path . " " . $foxml_file_path . " 2>/dev/null");
     
     // Add the ds.OBJ Datastream
-    
-    //$obj_datastream_path = "/mnt/smb/fedora/data/datastreamStore/e6/info%3Afedora%2Fshakespeare%3A3%2FOBJ%2FOBJ.0 -";
     $datastream_store_dir = new RecursiveDirectoryIterator($datastream_store_path);
     $datastream_store_iter = new RecursiveIteratorIterator($datastream_store_dir);
 
-    $pdf_files = new RegexIterator($datastream_store_iter, "/" . "info%3Afedora%2F" . $object_file_name . "%2FOBJ%2FOBJ.0$/i", RecursiveRegexIterator::GET_MATCH);
+    $pdf_files = new RegexIterator($datastream_store_iter, "/" . "info%3Afedora%2F" . $object_file_name . "%2FOBJ$/i", RecursiveRegexIterator::GET_MATCH);
 
     drush_log( dt('Searching for the OBJ datastream file for !object_pid', array('!object_pid' => $object_id)), 'ok' );
     foreach($pdf_files as $obj_datastream_path => $_file) {
 
+      /*
       $pdf_text = shell_exec("/usr/bin/env pdftotext " . $obj_datastream_path . " -");
       $pdf_text = preg_replace('/[\x00-\x1F\x7F]/', ' ', $pdf_text);
+      */
+
+      print_r( $obj_datastream_path );
+      print "\n\n";
     }
 
-    //$solr_doc = new DOMDocument();
-    //$solr_doc->loadXML($solr_add_doc);
+    exit(1);
+
     $solr_doc = simplexml_load_string($solr_add_doc);
+
+    //print_r( $solr_doc->asXML() );    
 
     $doc_elements = $solr_doc->xpath('//add/doc');
     $doc_element = $doc_elements[0];
 
-    //echo htmlentities($pdf_text);
-    //echo $pdf_text;
-    //exit(1);
-
     $field = $doc_element->addChild('field', htmlspecialchars($pdf_text));
     $field->addAttribute('name', 'ds.OBJ');
-
-    // Add the element
-    //echo $solr_doc->asXML();
-    //exit(1);
 
     // POST with cURL
     $ch = curl_init();

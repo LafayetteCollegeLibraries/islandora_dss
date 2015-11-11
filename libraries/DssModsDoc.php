@@ -274,6 +274,504 @@ abstract class DssModsDoc {
   }
 
 
+class TrusteeModsDoc extends DssModsDoc {
+
+  const MODS_XML = '
+<mods xmlns="http://www.loc.gov/mods/v3" xmlns:mods="http://www.loc.gov/mods/v3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xlink="http://www.w3.org/1999/xlink" version="3.6">
+    <titleInfo>
+        <title></title>
+    </titleInfo>
+    <typeOfResource>text</typeOfResource>
+    <originInfo>
+        <place>
+            <placeTerm type="text">Easton</placeTerm>
+        </place>
+        <place>
+            <placeTerm type="text">Northampton County</placeTerm>
+        </place>
+        <place>
+            <placeTerm type="text">Pennsylvania</placeTerm>
+        </place>
+        <place>
+            <placeTerm type="text">United States</placeTerm>
+        </place>
+        <publisher>Lafayette College</publisher>
+        <dateIssued keyDate="yes" encoding="w3cdtf"></dateIssued>
+    </originInfo>
+    <language>
+        <languageTerm authority="iso639-2b">eng</languageTerm>
+        <languageTerm type="text">English</languageTerm>
+    </language>
+    <physicalDescription>
+        <internetMediaType>application/pdf</internetMediaType>
+        <digitalOrigin>born digital</digitalOrigin>
+    </physicalDescription>
+    <relatedItem type="host">
+        <titleInfo>
+            <title>Board of Trustee Minutes</title>
+        </titleInfo>
+        <part>
+            <detail type="volume">
+                <number></number>
+                <caption>vol.</caption>
+            </detail>
+            <detail type="number">
+                <number></number>
+                <caption>no.</caption>
+            </detail>
+            <date></date>
+        </part>
+    </relatedItem>
+    <accessCondition type="restriction on access">Restricted: Board of Trustees of Lafayette College</accessCondition>
+</mods>
+    ';
+
+  function __construct($csv_row, $xmlstr = NULL) {
+
+    if(!is_null($xmlstr)) {
+
+      parent::__construct($xmlstr);
+    } else {
+
+      parent::__construct(self::MODS_XML);
+    }
+
+    $this->set_record($csv_row);
+  }
+
+  function get_label() {
+
+    $title_elements = $this->doc->xpath('/mods:mods/mods:titleInfo/mods:title');
+
+    for($i=0;$i < count($title_elements);$i++) {
+      
+      $title .= (string) $title_elements[$i];
+    }
+
+    return $title;
+  }
+
+  function add_title($values) {
+
+    $titleInfo = $this->doc->addChild('titleInfo');
+
+    $child_elements_map = array('title',
+				'subTitle',
+				'partName');
+
+    foreach($values as $i => $value) {
+
+      if(!empty($value)) {
+
+	// For handling casing issues in relation to DSS-488
+	//
+	if($i > 1) {
+
+	  $value = ucfirst($value);
+
+	  $titleInfo->addChild($child_elements_map[$i], $value);
+	} else {
+
+	  $titleInfo->addChild($child_elements_map[$i], $value);
+	}
+      }
+    }
+  }
+
+  /**
+   *
+   */
+  function add_name($values) {
+
+    if(empty($values[0])) {
+
+      return;
+    }
+
+    $name = $this->doc->addChild('name');
+
+    $authority_uri = array_shift($values);
+    if(!empty($authority_uri)) {
+
+      // Cleaning the authority URI's
+      /*
+      if($values[0] == "Rothwell, Kenneth S. (Kenneth Sprague)") {
+
+	$name['authorityURI'] = 'http://id.loc.gov/authorities/names/n88630613';
+      } elseif($values[0] == "Isenberg, Seymour") {
+
+	$name['authorityURI'] = 'http://id.loc.gov/authorities/names/n79079246';
+      } elseif($values[0] == "Lusardi, James P.") {
+
+	$name['authorityURI'] = 'http://id.loc.gov/authorities/names/n90621834';
+      } elseif($values[0] == "Schlueter, June") {
+
+	$name['authorityURI'] = 'http://id.loc.gov/authorities/names/n79012658';
+      } elseif($values[0] == "Kliman, Bemice W.") {
+
+	$name['authorityURI'] = 'http://id.loc.gov/authorities/names/n85281505';
+      }
+      */
+    }
+    
+    $displayFormValue = array_shift($values);
+    if(!empty($displayFormValue)) {
+
+      $displayForm = $name->addChild('displayForm', $displayFormValue);
+    }
+
+    $affiliation_value = array_shift($values);
+    if(!empty($affiliation_value)) {
+
+      $name->addChild('affiliation', $affiliation_value);
+    }
+
+    $name_children = $name->children();
+
+    if(empty($name_children)) {
+
+      $last_name = dom_import_simplexml($name);
+      $last_name->parentNode->removeChild($last_name);
+
+    } else {
+
+      $name['type'] = 'personal';
+
+      // Add the MARC relator for the role
+      $role = $name->addChild('role');
+
+      $role_value = array_shift($values);
+      $roleTerm = $role->addChild('roleTerm', $role_value);
+      $roleTerm['type'] = 'text';
+
+      if($role_value == 'author') {
+
+	$roleTerm = $role->addChild('roleTerm', 'aut');
+	$roleTerm['type'] = 'code';
+	$roleTerm['authority'] = 'marcrelator';
+      }
+    }
+  }
+
+  // <originInfo and all child elements
+  /**
+   *
+   * "originInfo_place_placeTerm","originInfo_Publisher","originInfo_frequency_authorityMARCfrequency","originInfo_dateIssued_ISO8601",
+   *
+   */
+  function add_origin_info($values) {
+
+    $originInfo = $this->doc->addChild('originInfo');
+
+    $place_value = array_shift($values);
+    if(!empty($place_value)) {
+
+      $place = $originInfo->addChild('place');
+      $placeTerm = $place->addChild('placeTerm', $place_value);
+      $placeTerm['type'] = 'text';
+    }
+
+    $publisher_value = array_shift($values);
+    if(!empty($publisher_value)) {
+
+      $publisher = $originInfo->addChild('publisher', $publisher_value);
+    }
+    
+    $frequency_value = array_shift($values);
+    if(!empty($frequency_value)) {
+
+      $frequency = $originInfo->addChild('frequency', $frequency_value);
+      $frequency->addAttribute('authority', 'marcfrequency');
+    }
+
+    $date_issued_value = array_shift($values);
+    if(!empty($date_issued_value)) {
+
+      $date_issued = $originInfo->addChild('dateIssued', $date_issued_value);
+      $date_issued->addAttribute('encoding', 'iso8601');
+      
+      // Generate the W3C formatted Datestamp
+      $date_normal = new DateTime($date_issued_value, new DateTimezone("GMT"));
+      $date_normal_value = $date_normal->format('c');
+      $date_issued_datestamp = preg_replace('/\+00\:00/', 'Z', $date_normal_value);
+
+      $date_issued = $originInfo->addChild('dateIssued', $date_issued_datestamp);
+      $date_issued->addAttribute('encoding', 'w3cdtf');
+    }
+  }
+
+  // <relatedItem> and all child elements
+  // (Please note that this is to be deprecated in preference to using the isMemberOf predicate for Islandora Collection Objects
+  function add_related_item($values) {
+
+    foreach($values as $value) {
+
+      if(!empty($value)) {
+
+	$relatedItem = $this->doc->addChild('relatedItem');
+	$relatedItem->addAttribute('type', 'host');
+	$titleInfo = $relatedItem->addChild('titleInfo');
+	$title = $titleInfo->addChild('title', $value);
+      }
+    }
+  }
+
+  /**
+   *
+   */
+  function add_related_item_primary($value) {
+
+    $relatedItem = $this->doc->addChild('relatedItem');
+    $relatedItem->addAttribute('type', 'host');
+
+    $titleInfo = $relatedItem->addChild('titleInfo');
+    $title = $titleInfo->addChild('title', $value);
+  }
+
+  function add_related_item_first($values) {
+
+    if(empty($values[0])) {
+
+      return;
+    }
+
+    $relatedItem = $this->doc->addChild('relatedItem');
+    $relatedItem->addAttribute('type', 'host');
+
+    $value = array_shift($values);
+    if(!empty($value)) {
+
+      $titleInfo = $relatedItem->addChild('titleInfo');
+      $title = $titleInfo->addChild('title', $value);
+    }
+
+    $value = array_shift($values);
+    if(!empty($value)) {
+
+      $identifier = $relatedItem->addChild('identifier', $value);
+      $identifier->addAttribute('type', 'issn');
+    }
+    
+    $part = $relatedItem->addChild('part');
+
+    $detail_element_map = array(array('type' => 'volume caption', 'child' => 'caption'),
+				array('type' => 'volume number', 'child' => 'number'),
+
+				array('type' => 'issue caption', 'child' => 'caption'),
+				array('type' => 'issue number', 'child' => 'number'));
+
+    for($i=0;$i<4;$i++) {
+
+      $value = array_shift($values);
+      if(!empty($value)) {
+
+	$detail = $part->addChild('detail');
+
+	$detail->addAttribute('type', $detail_element_map[$i]['type']);
+	$detail->addChild($detail_element_map[$i]['child'], $value);
+      }
+    }
+
+    $value = array_shift($values);
+    if(!empty($value)) {
+
+      $date_approximate = $part->addChild('date', $value);
+      $date_approximate->addAttribute('qualifier', 'approximate');
+    }
+    
+    $value = array_shift($values);
+    if(!empty($value)) {
+
+      $date_iso = $part->addChild('date', $value);
+      $date_iso->addAttribute('encoding', 'iso8601');
+
+      // Generate the W3C formatted Datestamp
+      $date_normal = new DateTime($value, new DateTimezone("GMT"));
+      $date_normal_value = $date_normal->format('c');
+      $date_iso_datestamp = preg_replace('/\+00\:00/', 'Z', $date_normal_value);
+
+      $date_iso = $part->addChild('date', $date_iso_datestamp);
+      $date_iso->addAttribute('encoding', 'w3cdtf');
+    }
+  }
+
+  /*
+   *
+   */
+  function add_related_item_second($values) {
+
+    if(empty($values[0])) {
+
+      return;
+    }
+
+    $relatedItem = $this->get_element('/mods:mods/mods:relatedItem', 'relatedItem');
+    $part = $relatedItem->addChild('part');
+
+    $detail_element_map = array(array('type' => 'volume caption', 'child' => 'caption'),
+				array('type' => 'volume number', 'child' => 'number'),
+
+				array('type' => 'issue caption', 'child' => 'caption'),
+				array('type' => 'issue number', 'child' => 'number'));
+
+    for($i=0;$i<4;$i++) {
+
+      $value = array_shift($values);
+      if(!empty($value)) {
+
+	$detail = $part->addChild('detail');
+
+	$detail->addAttribute('type', $detail_element_map[$i]['type']);
+	$detail->addChild($detail_element_map[$i]['child'], $value);
+      }
+    }
+
+    $value = array_shift($values);
+    if(!empty($value)) {
+
+      $date_approximate = $part->addChild('date', $value);
+      $date_approximate->addAttribute('qualifier', 'approximate');
+    }
+    
+    $value = array_shift($values);
+    if(!empty($value)) {
+
+      $date_iso = $part->addChild('date', $value);
+      $date_iso->addAttribute('encoding', 'iso8601');
+
+      // Generate the W3C formatted Datestamp
+      $date_normal = new DateTime($value, new DateTimezone("GMT"));
+      $date_normal_value = $date_normal->format('c');
+      $date_iso_datestamp = preg_replace('/\+00\:00/', 'Z', $date_normal_value);
+
+      $date_iso = $part->addChild('date', $date_iso_datestamp);
+      $date_iso->addAttribute('encoding', 'w3cdtf');
+    }
+  }
+
+  function add_note($values) {
+
+    if(!empty($values[0])) {
+
+      $note = $this->doc->addChild('note', $values[0]);
+      $note['type'] = 'source note'; // In compliance with Generic Descriptive Metadata (GDM); Please see http://www.loc.gov/standards/mods/mods-notes.html
+    }
+  }
+
+  // <part> and all child elements
+  function add_part($values) {
+
+    $part = $this->doc->relatedItem->addChild('part');
+
+    $detail_type_map = array('volume',
+			     'issue');
+
+    // @todo Refactor
+    $norm_date = array_pop($values);
+    $date = $part->addChild('date', $norm_date);
+    $date['encoding'] = 'iso8601';
+
+    // @todo Implement handling for the indexing and retrieval of datestamps
+    $gmt_date = new DateTime($norm_date, new DateTimeZone('UTC'));
+    $gmt_date_solr = preg_replace('/\+00\:00/', 'Z', $gmt_date->format('c'));
+
+    $date_w3cdtf = $part->addChild('date', $gmt_date_solr);
+    $date_w3cdtf['encoding'] = 'w3cdtf';
+
+    $approx_date_value = array_pop($values);
+
+    $approx_date = $part->addChild('date', $approx_date_value);
+    $approx_date['qualifier'] = 'approximate';
+
+    foreach(array_slice($values, 0, 2) as $i => $value) {
+
+      if(!empty($value)) {
+
+	$text = $part->addChild('text', $value);
+	$text['type'] = $detail_type_map[$i % 2];
+      }
+
+      if(!empty($values[$i + 2])) {
+
+	$detail = $part->addChild('detail');
+	$detail['type'] = $detail_type_map[$i % 2];
+	$number = $detail->addChild('number', $values[$i + 2]);
+      }
+    }
+
+    // Extend for handling cases in which there is only a single, secondary entity for <relatedItem>
+    for($j=1;$j < count($this->doc->relatedItem);$j++) {
+
+      $originInfo = $this->doc->relatedItem[$j]->addChild('originInfo');
+      $dateIssued = $originInfo->addChild('dateIssued', $gmt_date_solr);
+      $dateIssued['encoding'] = 'w3cdtf';
+      $dateIssued['keyDate'] = 'yes';
+
+      $approx_dateIssued = $originInfo->addChild('dateIssued', $approx_date_value);
+      $approx_dateIssued['qualifier'] = 'approximate';
+    }
+  }
+
+  function add_identifier($value) {
+
+    $identifier = $this->doc->addChild('identifier', $value);
+
+    $identifier->addAttribute('type', 'local');
+    $identifier->addAttribute('displayLabel', 'Locally generated sequencing index');
+  }
+
+  public function set_collection($collection) {
+
+    $this->collection = $collection;
+    $note = $this->doc->addChild('note', $this->collection);
+    $note->addAttribute('type', 'admin');
+  }
+
+  function set_record($csv_row) {
+
+    /*
+     *
+     */
+
+    $title_values = array_slice($csv_row, 1, 3);
+    $this->add_title($title_values);
+
+    $name_values = array_slice($csv_row, 4, 4);
+    $this->add_name($name_values);
+
+    $name_values = array_slice($csv_row, 8, 4);
+    $this->add_name($name_values);
+
+    $name_values = array_slice($csv_row, 12, 4);
+    $this->add_name($name_values);
+
+    $name_values = array_slice($csv_row, 16, 4);
+    $this->add_name($name_values);
+
+    $origin_info_values = array_slice($csv_row, 20, 4);
+    $this->add_origin_info($origin_info_values);
+
+    $related_item_first = array_slice($csv_row, 24, 8);
+    $this->add_related_item_first($related_item_first);
+
+    $related_item_second = array_slice($csv_row, 32, 6);
+    $this->add_related_item_second($related_item_second);
+
+    $this->add_note(array_slice($csv_row, 38, 1));
+
+    /*
+     *
+     */
+    $this->set_collection('Board of Trustee Minutes Collection');
+
+    return $this->validate();
+  }
+}
+
+/**
+ * Class for the Shakespeare MODS Document
+ *
+ */
 class ShakespeareModsDoc extends DssModsDoc {
 
   const MODS_XML = '
@@ -281,33 +779,6 @@ class ShakespeareModsDoc extends DssModsDoc {
   <typeOfResource>text</typeOfResource>
 </mods>
     ';
-  
-  /*
-  static public $fields_xpath_solr_map = array('Title' => "./mods:titleInfo/mods:title",
-					       'Sub-Title' => "./mods:titleInfo/mods:title[@xml:lang='en-US']",
-					       'Part Number' => "./mods:titleInfo/mods:title[@xml:lang='Jpan']",
-					       'Personal Author' => "./mods:titleInfo/mods:title[@xml:lang='zh']",
-					       'Place of Publication' => "./mods:titleInfo/mods:title[@xml:lang='Kore']",
-					       'Publisher' => array('xpath' => "./mods:subject[@authorityURI='http://www.yale.edu/hraf/outline.htm']/mods:topic",
-								      'facet' => true),
-
-					       'Issue of' => "./mods:note[@type='content']",
-					       'Issue of' => array('xpath' => "./mods:note[@type='indicia']",
-									      'facet' => true),
-
-					       'Volume' => './mods:note[@type="handwritten" and @xml:lang="Jpan"]',
-
-					       'Issue' => './mods:abstract[@xml:lang="en-US"]',
-					       'Volume Number' => "./mods:abstract[@xml:lang='zh']",
-					       'Issue Number' => "./mods:abstract[@xml:lang='Jpan']",
-					       'Note' => "./mods:abstract[@xml:lang='Kore']",
-					       
-					       'Date of Publication' => array('xpath' => "./mods:subject/mods:geographic",
-									      'facet' => true),
-
-					       ''
-					       );
-  */
 
   function __construct($csv_row, $xmlstr = NULL) {
 
@@ -347,7 +818,17 @@ class ShakespeareModsDoc extends DssModsDoc {
 
       if(!empty($value)) {
 
-	$titleInfo->addChild($child_elements_map[$i], $value);
+	// For handling casing issues in relation to DSS-488
+	//
+	if($i > 1) {
+
+	  $value = ucfirst($value);
+
+	  $titleInfo->addChild($child_elements_map[$i], $value);
+	} else {
+
+	  $titleInfo->addChild($child_elements_map[$i], $value);
+	}
       }
     }
   }
@@ -404,7 +885,9 @@ class ShakespeareModsDoc extends DssModsDoc {
 
     if(empty($name_children)) {
 
-      unset($this->doc->name);
+      $last_name = dom_import_simplexml($name);
+      $last_name->parentNode->removeChild($last_name);
+
     } else {
 
       $name['type'] = 'personal';
@@ -489,15 +972,16 @@ class ShakespeareModsDoc extends DssModsDoc {
   }
 
   /*
-"relatedItem_typeHost_titleInfo_title",
-"relatedItem_identifier_typeISSN",
-"relatedItem_part1_detaii1_typeVolume_caption",
-"relatedItem_part1_detail1_typeVolume_number",
-"relatedItem_part1_detail1_typeIssue_caption",
-"relatedItem_part1_detail1_typeIssue_number",
-"relatedItem_part1_date_qualifierApproximate",
-"relatedItem_part1_date_encodingISO8601",
    */
+
+  function add_related_item_primary($value) {
+
+    $relatedItem = $this->doc->addChild('relatedItem');
+    $relatedItem->addAttribute('type', 'host');
+
+    $titleInfo = $relatedItem->addChild('titleInfo');
+    $title = $titleInfo->addChild('title', $value);
+  }
 
   function add_related_item_first($values) {
 
@@ -567,15 +1051,6 @@ class ShakespeareModsDoc extends DssModsDoc {
   }
 
   /*
-   *
-
-"relatedItem_part2_detail2_typeVolume_caption",
-"relatedItem_part2_detail1_typeVolume_number",
-"relatedItem_part2_detail2_typeIssue_caption",
-"relatedItem_part2_detail2_typeIssue_number",
-"relatedItem_part2_date_qualifierApproximate",
-"relatedItem_part2_date_encodingISO8601",
-
    */
 
   function add_related_item_second($values) {
@@ -710,28 +1185,9 @@ class ShakespeareModsDoc extends DssModsDoc {
   function set_record($csv_row) {
 
     /*
-    $title_values = array_slice($csv_row, 1, 4);
-    $this->add_title($title_values);
+     *
+     */
 
-    $name_values = array_slice($csv_row, 5, 5);
-    $this->add_name($name_values);
-
-    $origin_info_values = array_slice($csv_row, 10, 2);
-    $this->add_origin_info($origin_info_values);
-
-    $rel_item_values = array_slice($csv_row, 12, 2);
-    $this->add_related_item($rel_item_values);
-
-    $part_values = array_slice($csv_row, 14, 4);
-    $part_values = array_merge($part_values, array_slice($csv_row, 19, 2));
-
-    $this->add_part($part_values);
-
-    $note_values = array_slice($csv_row, 18, 1);
-    $this->add_note($note_values);
-
-    $this->add_identifier($csv_row[21]);
-    */
     $title_values = array_slice($csv_row, 1, 3);
     $this->add_title($title_values);
 
@@ -756,38 +1212,13 @@ class ShakespeareModsDoc extends DssModsDoc {
     $related_item_second = array_slice($csv_row, 32, 6);
     $this->add_related_item_second($related_item_second);
 
+    //$this->add_related_item_primary("Bulletin of the New York Shakespeare Society");
+
     $this->add_note(array_slice($csv_row, 38, 1));
 
     /*
-    "File",
-
-"titleInfo_title","titleInfo_subTitle","titleInfo_partName",
-
-"name1_authorityURI","name1_displayForm","name1_affilliation","name1_role",
-"name2_authorityURI","name2_displayForm","name2_affilliation","name2_role",
-"name3_authorityURI","name3_displayForm","name3_affilliation","name3_role",
-"name4_authorityURI","name4_displayForm","name4_affilliation","name4_role",
-
-"originInfo_place_placeTerm","originInfo_Publisher","originInfo_frequency_authorityMARCfrequency","originInfo_dateIssued_ISO8601",
-
-"relatedItem_typeHost_titleInfo_title",
-"relatedItem_identifier_typeISSN",
-"relatedItem_part1_detaii1_typeVolume_caption",
-"relatedItem_part1_detail1_typeVolume_number",
-"relatedItem_part1_detail1_typeIssue_caption",
-"relatedItem_part1_detail1_typeIssue_number",
-"relatedItem_part1_date_qualifierApproximate",
-"relatedItem_part1_date_encodingISO8601",
-
-"relatedItem_part2_detail2_typeVolume_caption",
-"relatedItem_part2_detail1_typeVolume_number",
-"relatedItem_part2_detail2_typeIssue_caption",
-"relatedItem_part2_detail2_typeIssue_number",
-"relatedItem_part2_date_qualifierApproximate",
-"relatedItem_part2_date_encodingISO8601",
-
-"note"
-    */
+     *
+     */
 
     $this->set_collection('Shakespeare Bulletin Archive');
 
@@ -824,8 +1255,6 @@ class AlumniModsDoc extends DssModsDoc {
 					       
 					       'Date of Publication' => array('xpath' => "./mods:subject/mods:geographic",
 									      'facet' => true),
-
-					       ''
 					       );
 
   function __construct($csv_row, $xmlstr = NULL) {
@@ -1058,13 +1487,6 @@ class AlumniModsDoc extends DssModsDoc {
   }
 
   function set_record($csv_row) {
-
-    // Direct mapping
-    // "File", "TitleInfoNonSort","TitleInfoTitle","TitleInfoSubtitle","TitleInfoPartNumber",
-    // "Name_AuthorityURI","NamePart_DisplayForm_PersonalAuthor","NamePart_Family_PersonalAuthor","NamePart_Given_PersonalAuthor","NamePart_Date_PersonalAuthor",
-    // "OriginInfoPlaceTerm","OriginInfoPublisher",
-    // "RelatedItemHost_1_TitleInfoTitle","RelatedItemHost_2_TitleInfoTitle",
-    // "PartDetailTypeVolume","PartDetailTypeIssue","PartDetailTypeVolumeNumber","PartDetailTypeIssueNumber","Note","PartDate_NaturalLanguage","PartDate_ISO8601"
 
     $title_values = array_slice($csv_row, 1, 4);
     $this->add_title($title_values);
@@ -1866,22 +2288,6 @@ class MdlPrintsModsDoc extends DssModsDoc {
 
   function add_creator($field_value) {
 
-    /*
-			    'Creator' => array('xpath' => "./mods:name/mods:role/mods:roleTerm[text() = 'cre']/../../mods:namePart",
-					       'facet' => true),
-    */
-    /*
-<namePart>#{term}</namePart>
-<role>
-<roleTerm type='text'>creator</roleTerm>
-<roleTerm type='code'>cre</roleTerm>
-</role>
-</name>"
-
-            @root << "<name type='personal'>
-<namePart>#{term}</namePart>
-    */
-
     $name = $this->doc->addChild('name');
     $name->addAttribute('type', 'personal');
     $namePart = $name->addChild('namePart', $field_value);
@@ -1912,58 +2318,6 @@ class MdlPrintsModsDoc extends DssModsDoc {
   function add_date_original($field_value) {
 
     // @todo Implement normalization for date values
-    /*
------------------
- Aug. 1806
- 1824
- 1892
- 1831
- 1894
- 1854
- 1790
- 1794
- [1825]
- [1824]
- 1850
- 1918
- 1823
- Feb. 3, 1791
- 1856
- 1792
- 1838
- 1896
- 1796
- 1833
- 1898
- 1932
- 1798
- Aug. 26, 1785
- 1895
- 1934
- 1830
- 1876
- 1843
- 1839
- 1829
- c1830
- July 1, 1794
- January 1825
- 1868
- 1835
- 1842
- 1791
- 1920
- 1834
- 
- 1926
- March 28, 1825
- Nov. 23, 1830
- 1863
- August 10, 1830
- 1859
- June 1, 1791
-
-     */
 
     // For year ranges
     // e. g. 1939-1940

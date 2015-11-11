@@ -93,6 +93,26 @@ function drush_islandora_dss_islandora_book_shakespeare_generate_path_aliases($c
   drush_log(dt('Successfully generate the path alias !alias for !source', array('!alias' => $alias, '!source' => $source)), 'success');
 }
 
+function drush_islandora_dss_islandora_book_shakespeare_ingest_metadata($object_pid,
+									$csv_row_index,
+									$csv_file_path) {
+
+  // Index the metadata values by file ID
+  $metadata_csv = array_map('str_getcsv', file($csv_file_path));
+
+  $mods = new ShakespeareModsDoc($metadata_csv[$csv_row_index]);
+
+  $mods_content = (string) $mods;
+
+  print $mods_content;
+  exit(1);
+
+  $object = islandora_object_load($object_pid);
+
+  $mods_ds = $object['MODS'];
+  $mods_ds->setContentFromString($mods_content);
+}
+
 function drush_islandora_dss_islandora_book_shakespeare_ingest_collection($tiff_dir_path,
 									  $pdf_dir_path,
 									  $csv_file_path,
@@ -145,6 +165,8 @@ function drush_islandora_dss_islandora_book_shakespeare_ingest_collection($tiff_
   $pdf_iter = new RecursiveIteratorIterator($pdf_dir);
   $pdf_files = new RegexIterator($pdf_iter, '/^.+\.pdf$/i', RecursiveRegexIterator::GET_MATCH);
 
+  $count = 3;
+
   foreach($pdf_files as $pdf_file_path => $pdf_file) {
 
     if(!preg_match('/\/(S.+?)\.pdf/', $pdf_file_path, $file_name_match)) {
@@ -164,39 +186,54 @@ function drush_islandora_dss_islandora_book_shakespeare_ingest_collection($tiff_
 
       $file_name = $pdf_file_path;
 
-      $bulletin = islandora_object_load("shakespeare:$i");
+      $bulletin = islandora_object_load("shakespeare:$count");
+
+      //$bulletin = islandora_object_load("shakespeare:$i");
 
       /**
        * Ingestion functionality for the PDF Datastreams
        *
        */
+      /*
       drush_log(dt("Ingesting a new Book Object for !label...", array('!label' => $label)), 'ok');
       $bulletin = islandora_prepare_new_object($id, $label, array(), array('islandora:bookCModel'), $relationships);
       islandora_add_object($bulletin);
       drush_log(t("Ingested $file_name into the Book Object {$bulletin->id}"), 'success');
+      */
       
       // Abstract and refactor
       drush_log(t("Ingesting $file_name into the OBJ datastream..."), 'ok');
-      $obj_ds = $bulletin->constructDatastream('OBJ', 'M');
+      exit(1);
+
+      if($bulletin['OBJ']) {
+	$obj_ds = $bulletin['OBJ'];
+	$obj_ds->setContentFromFile($file_name);
+      } else {
+	$obj_ds = $bulletin->constructDatastream('OBJ', 'M');
       
-      $obj_ds->label = $label;
+	$obj_ds->label = $label;
       
-      $obj_ds->mimeType = 'application/pdf';
-      $obj_ds->setContentFromFile($file_name);
-      $bulletin->ingestDatastream($obj_ds);
-      drush_log(t("Ingested $file_name into the OBJ datastream"), 'success');
+	$obj_ds->mimeType = 'application/pdf';
+	$obj_ds->setContentFromFile($file_name);
+	$bulletin->ingestDatastream($obj_ds);
+	drush_log(t("Ingested $file_name into the OBJ datastream"), 'success');
+      }
   
       // Abstract and refactor
 
       // Refactor
+      /*
       drush_log(t("Generating the thumbnail for {$bulletin->id}..."), 'ok');
       $width = variable_get('islandora_pdf_thumbnail_width', 200);
       $height = variable_get('islandora_pdf_thumbnail_height', 200);
       islandora_pdf_add_jpg_derivative($bulletin, $file_name, 'TN', $width, $height);
       drush_log(t("Generated the thumbnail for {$bulletin->id}"), 'success');
+      */
 
       // Ingest the MODS Document
       $mods_content = (string) $mods;
+
+      /*
       if($bulletin['MODS']) {
 
 	$mods_ds = $bulletin['MODS'];
@@ -211,6 +248,9 @@ function drush_islandora_dss_islandora_book_shakespeare_ingest_collection($tiff_
       }
 
       drush_log(t("Ingested the MODS Document into the MODS datastream"), 'success');
+      */
+
+      $count++;
     }
   }
 }

@@ -249,12 +249,13 @@ function drush_islandora_dss_islandora_collection_purge_citation_aliases($collec
 }
 
 function drush_islandora_dss_islandora_collection_generate_derivatives_jpg($collection = NULL,
+									   $start = 0,
+									   $end = 100000,
 									   $solr_host = 'localhost',
 									   $solr_port = 8080,
 									   $solr_path = 'solr/fedora/',
 									   $islandora_book_derive_callback = 'islandora_dss_generate_derivative_jpg_book',
-									   $islandora_large_image_derive_callback = 'islandora_dss_generate_derivative_jpg_large_image'
-									   ) {
+									   $islandora_large_image_derive_callback = 'islandora_dss_generate_derivative_jpg_large_image') {
 
   $EASTASIA_RELATION_MAP = array(
 				 //'East Asia Image Collection' => 'eastasia',
@@ -318,7 +319,7 @@ function drush_islandora_dss_islandora_collection_generate_derivatives_jpg($coll
     try {
 
       $solr_query = "cdm.Relation.IsPartOf:\"$collection\"";
-      $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf', 'sort' => 'dc.title asc'));
+      $results = $solr->search($solr_query, 0, 1000000, array('fl' => 'PID cdm.Relation.IsPartOf dc.title', 'sort' => 'dc.title asc'));
     } catch (Exception $e) {
 
       drupal_set_message(check_plain(t('Error searching Solr index')) . ' ' . $e->getMessage(), 'error');
@@ -329,9 +330,15 @@ function drush_islandora_dss_islandora_collection_generate_derivatives_jpg($coll
 
       $subcollection = array_pop($solr_doc['cdm.Relation.IsPartOf']);
 
-      //drush_log( dt('Generating branded derivatives for members of !collection', array('!collection' => $subcollection)), 'ok' );
-
       if(array_key_exists($subcollection, $EASTASIA_RELATION_MAP)) {
+
+	if(preg_match('/\d{4}\]/', $solr_doc['dc.title'], $metadb_item_match)) {
+
+	  if(intval($metadb_item_match[0]) < $start) {
+
+	    continue;
+	  }
+	}
 
 	call_user_func($islandora_book_derive_callback, $solr_doc['PID'], $connection, $collection);
       } else {
@@ -343,11 +350,15 @@ function drush_islandora_dss_islandora_collection_generate_derivatives_jpg($coll
 }
 
 function drush_islandora_dss_islandora_collection_generate_derivatives_jpg_full($collection = NULL,
+										$start = 0,
+										$end = 100000,
 										$solr_host = 'localhost',
 										$solr_port = 8080,
 										$solr_path = 'solr/fedora/') {
 
   drush_islandora_dss_islandora_collection_generate_derivatives_jpg($collection,
+								    $start,
+								    $end,
 								    $solr_host,
 								    $solr_port,
 								    $solr_path,

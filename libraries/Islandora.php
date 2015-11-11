@@ -63,11 +63,6 @@ class IslandoraSession {
                     <fedora-model:hasModel> " . $content_model . ";
                     <fedora-model:state> " . $state . " .";
 
-    /*
-      FILTER(sameTerm($collection_predicate, <fedora-rels-ext:isMemberOfCollection>) || sameTerm($collection_predicate, <fedora-rels-ext:isMemberOf>))
-      FILTER (!sameTerm($content, <info:fedora/fedora-system:FedoraObject-3.0>))";
-    */
-
     $query .= "
 
      }";
@@ -143,8 +138,6 @@ class IslandoraSolrIndex {
 
   function delete($object_id) {
 
-    // http://crete0.stage.lafayette.edu:8080/fedoragsearch/rest?operation=updateIndex&action=deletePid&value=test
-
     /**
      * @todo Refactor using Guzzle
      *
@@ -204,9 +197,6 @@ class IslandoraObject implements Serializable {
   }
 
   public function serialize() {
-
-    //$this->object = (object) array('id' => $pid);
-    //$this->object = $this->session->get_object($this->object->id);
 
     unset($this->object);
     $this->object = (object) array('id' => $pid);
@@ -463,22 +453,10 @@ class IslandoraCollection extends IslandoraObject {
             FILTER(sameTerm($collection_predicate, <fedora-rels-ext:isMemberOfCollection>) || sameTerm($collection_predicate, <fedora-rels-ext:isMemberOf>))
             FILTER (!sameTerm($content, <info:fedora/fedora-system:FedoraObject-3.0>))';
 
-    /*
-    $enforced = variable_get('islandora_namespace_restriction_enforced', FALSE);
-    if ($enforced) {
-      $namespace_array = explode(' ', variable_get('islandora_pids_allowed', 'default: demo: changeme: ilives: islandora-book: books: newspapers: '));
-      $namespace_array = array_map('islandora_get_namespace', $namespace_array);
-      $namespace_array = array_filter($namespace_array, 'trim');
-      $namespace_sparql = implode('|', $namespace_array);
-      $query .= 'FILTER(regex(str(?object), "info:fedora/(' . $namespace_sparql . '):"))';
-    }
-    */
     $query .= '} ORDER BY $title';
     $query_array = array(
 			 'query' => $query,
 			 'type' => 'sparql',
-			 //'pid' => $obj_pid,
-			 // Seems as though this is ignored completely.
 			 'page_size' => $page_size,
 			 'page_number' => $page_number,
 			 );
@@ -487,15 +465,6 @@ class IslandoraCollection extends IslandoraObject {
 
       $content_model_pid = $result['content']['value'];
 
-      /*
-      if($content_model_pid == 'islandora:collectionCModel') {
-
-        $this->members[] = new IslandoraCollection($this->session, $result['object']['value']);
-      } else {
-
-	// @todo Implement
-      }
-      */
       if(!is_null($class)) {
 
 	$this->members[] = new $class($this->session, $result['object']['value']);
