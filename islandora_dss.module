@@ -748,6 +748,7 @@ function islandora_dss_generate_islandora_paths($coll_pid, $solr_host = 'localho
 				 'Scenic Taiwan' => 'eastasia/cpw-nofuko',
 				 'Taiwan Photographic Monthly' => 'eastasia/cpw-shashinkai',
 				 'Truku-Japanese War Commemorative Postcard Collection' => 'eastasia/truku',
+				 'Richard Mammana Japanese Empire Postcard Collection' => 'eastasia/mammana-postcards'
 				 );
 
   try {
